@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const BASE_URL = import.meta.env.VITE_BASE_URL || import.meta.env.REACT_APP_BASE_URL || 'http://localhost:5000';
+// Use production API URL - https://bidmaster-api.onrender.com/api
+const BASE_URL = import.meta.env.VITE_BASE_URL || import.meta.env.REACT_APP_BASE_URL || 'https://bidmaster-api.onrender.com/api';
 
 // Create axios instance with default config
 const api = axios.create({
