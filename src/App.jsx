@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ThemeProvider } from './components/ThemeProvider';
 import { AppSidebar } from './components/AppSidebar';
 import { TopNavbar } from './components/TopNavbar';
@@ -17,9 +17,34 @@ export default function App() {
     return !!localStorage.getItem('token');
   });
   const [userRole, setUserRole] = useState('super-admin');
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  
+  // Get current page from URL hash, default to 'dashboard'
+  const getPageFromHash = () => {
+    const hash = window.location.hash.replace('#', '');
+    const validPages = ['dashboard', 'users', 'products', 'orders', 'analytics', 'notifications', 'settings'];
+    return validPages.includes(hash) ? hash : 'dashboard';
+  };
+  
+  const [currentPage, setCurrentPage] = useState(() => getPageFromHash());
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  
+  // Sync URL hash with current page on mount and when hash changes
+  useEffect(() => {
+    const handleHashChange = () => {
+      const page = getPageFromHash();
+      setCurrentPage(page);
+    };
+    
+    window.addEventListener('hashchange', handleHashChange);
+    // Set initial hash if not present
+    if (!window.location.hash) {
+      window.location.hash = 'dashboard';
+    }
+    
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+  
   const handleLogin = role => {
     setUserRole(role);
     setIsAuthenticated(true);
@@ -29,6 +54,8 @@ export default function App() {
       setIsAuthenticated(false);
     } else {
       setCurrentPage(page);
+      // Update URL hash
+      window.location.hash = page;
     }
     setIsMobileSidebarOpen(false);
   };

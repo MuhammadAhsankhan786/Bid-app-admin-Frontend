@@ -7,6 +7,7 @@ import { Badge } from '../components/ui/badge';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { apiService } from '../services/api';
 import { toast } from 'sonner';
+import { PageLoader } from '../components/Loader';
 
 export function DashboardPage() {
   const [loading, setLoading] = useState(true);
@@ -66,7 +67,9 @@ export function DashboardPage() {
 
       if (categories && categories.length > 0) {
         const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b', '#ef4444'];
+        // Use index to create unique keys and handle duplicate names
         setCategoryData(categories.map((cat, index) => ({
+          id: `cat-${index}-${cat.name}`,
           name: cat.name,
           value: parseInt(cat.value) || 0,
           color: colors[index % colors.length]
@@ -98,10 +101,10 @@ export function DashboardPage() {
         { name: 'Sun', revenue: 0, bids: 0 }
       ]);
       setCategoryData([
-        { name: 'Electronics', value: 0, color: '#3b82f6' },
-        { name: 'Fashion', value: 0, color: '#8b5cf6' },
-        { name: 'Home', value: 0, color: '#ec4899' },
-        { name: 'Sports', value: 0, color: '#10b981' }
+        { id: 'cat-0-Electronics', name: 'Electronics', value: 0, color: '#3b82f6' },
+        { id: 'cat-1-Fashion', name: 'Fashion', value: 0, color: '#8b5cf6' },
+        { id: 'cat-2-Home', name: 'Home', value: 0, color: '#ec4899' },
+        { id: 'cat-3-Sports', name: 'Sports', value: 0, color: '#10b981' }
       ]);
       setRecentActions([]);
     } finally {
@@ -125,11 +128,7 @@ export function DashboardPage() {
   };
 
   if (loading) {
-    return React.createElement("div", { className: "space-y-6" },
-      React.createElement("div", { className: "text-center py-12" },
-        React.createElement("p", { className: "text-gray-600 dark:text-gray-400" }, "Loading dashboard...")
-      )
-    );
+    return React.createElement(PageLoader, { message: "Loading dashboard..." });
   }
 
   return React.createElement(
@@ -206,10 +205,10 @@ export function DashboardPage() {
           React.createElement(
             "div",
             { className: "mt-4 space-y-2" },
-            categoryData.map(cat =>
+            categoryData.map((cat, index) =>
               React.createElement(
                 "div",
-                { key: cat.name, className: "flex items-center justify-between" },
+                { key: cat.id || `category-${index}`, className: "flex items-center justify-between" },
                 React.createElement(
                   "div",
                   { className: "flex items-center gap-2" },
