@@ -11,8 +11,11 @@ import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { toast } from 'sonner';
 import { apiService } from '../services/api';
 import { InlineLoader } from '../components/Loader';
+import { hasModuleAccess, isReadOnly as checkReadOnly } from '../utils/roleAccess';
 
 export function ProductManagementPage({ userRole }) {
+  const normalizedRole = userRole === 'superadmin' ? 'super-admin' : userRole;
+  const canViewPendingProducts = hasModuleAccess(normalizedRole, 'Products') && !checkReadOnly(normalizedRole);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [pendingProducts, setPendingProducts] = useState([]);
@@ -32,16 +35,24 @@ export function ProductManagementPage({ userRole }) {
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const [pendingResponse, liveResponse] = await Promise.all([
-        apiService.getPendingProducts().catch(err => {
-          console.error("Error fetching pending products:", err);
-          return [];
-        }),
+      
+      // Build promises array conditionally based on role
+      const promises = [
+        // Only fetch pending products if user has access (not for viewers)
+        canViewPendingProducts 
+          ? apiService.getPendingProducts().catch(err => {
+              console.error("Error fetching pending products:", err);
+              return [];
+            })
+          : Promise.resolve([]),
+        // Live auctions are accessible to all roles
         apiService.getLiveAuctions().catch(err => {
           console.error("Error fetching live auctions:", err);
           return [];
         })
-      ]);
+      ];
+      
+      const [pendingResponse, liveResponse] = await Promise.all(promises);
       
       // Backend returns arrays directly, not wrapped in objects
       const pending = Array.isArray(pendingResponse) ? pendingResponse : (pendingResponse?.products || []);
@@ -170,13 +181,15 @@ export function ProductManagementPage({ userRole }) {
         </p>
       </div>
 
-      <Tabs defaultValue="pending" className="space-y-6">
+      <Tabs defaultValue={canViewPendingProducts ? "pending" : "live"} className="space-y-6">
         <TabsList>
-          <TabsTrigger value="pending" className="gap-2">
-            <Clock className="h-4 w-4" />
-            Pending Approvals
-            <Badge variant="secondary">{pendingProducts.length}</Badge>
-          </TabsTrigger>
+          {canViewPendingProducts && (
+            <TabsTrigger value="pending" className="gap-2">
+              <Clock className="h-4 w-4" />
+              Pending Approvals
+              <Badge variant="secondary">{pendingProducts.length}</Badge>
+            </TabsTrigger>
+          )}
           <TabsTrigger value="live" className="gap-2">
             <Timer className="h-4 w-4" />
             Live Auctions
@@ -184,8 +197,9 @@ export function ProductManagementPage({ userRole }) {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="pending" className="space-y-4">
-          <Card>
+        {canViewPendingProducts && (
+          <TabsContent value="pending" className="space-y-4">
+            <Card>
             <CardContent className="p-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -315,7 +329,8 @@ export function ProductManagementPage({ userRole }) {
               </Table>
             </CardContent>
           </Card>
-        </TabsContent>
+          </TabsContent>
+        )}
 
         <TabsContent value="live" className="space-y-4">
           {loading ? (

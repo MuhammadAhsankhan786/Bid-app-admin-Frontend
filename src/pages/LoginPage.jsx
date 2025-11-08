@@ -1,14 +1,13 @@
-import { useState, useEffect } from 'react';
-import { Phone, Shield, Users, Eye as EyeIcon, Lock } from 'lucide-react';
+import { useState } from 'react';
+import { Phone, Shield, KeyRound, Users, Eye as EyeIcon } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Checkbox } from '../components/ui/checkbox';
-import axios from 'axios';
+import { apiService } from '../services/api';
 import React from 'react';
 
-const BASE_URL = import.meta.env.REACT_APP_BASE_URL || import.meta.env.VITE_BASE_URL || 'http://localhost:5000';
+const BASE_URL = import.meta.env.VITE_BASE_URL || import.meta.env.REACT_APP_BASE_URL || 'http://localhost:5000/api';
 
 /**
  * Normalize Iraq phone number
@@ -59,18 +58,52 @@ export function LoginPage({ onLogin }) {
   const [phoneError, setPhoneError] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
-  const [selectedRole, setSelectedRole] = useState('super-admin');
+  const [selectedRole, setSelectedRole] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [resendCooldown, setResendCooldown] = useState(0);
   const [error, setError] = useState('');
 
-  // Resend cooldown timer
-  useEffect(() => {
-    if (resendCooldown > 0) {
-      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
-      return () => clearTimeout(timer);
+  // Mock phone numbers for each role
+  const rolePhones = {
+    'superadmin': '+9647701234567',
+    'moderator': '+9647701234568',
+    'viewer': '+9647701234569'
+  };
+
+  const roles = [
+    {
+      id: 'superadmin',
+      label: 'Super Admin',
+      subtitle: 'Full Access',
+      icon: Shield,
+      color: 'blue',
+      phone: rolePhones.superadmin
+    },
+    {
+      id: 'moderator',
+      label: 'Moderator',
+      subtitle: 'Manage users/products/orders',
+      icon: Users,
+      color: 'purple',
+      phone: rolePhones.moderator
+    },
+    {
+      id: 'viewer',
+      label: 'Viewer',
+      subtitle: 'Read-only access to analytics',
+      icon: EyeIcon,
+      color: 'green',
+      phone: rolePhones.viewer
     }
-  }, [resendCooldown]);
+  ];
+
+  const handleRoleSelect = (role) => {
+    setSelectedRole(role.id);
+    setPhone(role.phone);
+    setPhoneError('');
+    setError('');
+    setOtpSent(false);
+    setOtp('');
+  };
 
   const handlePhoneChange = (e) => {
     const value = e.target.value;
@@ -79,8 +112,7 @@ export function LoginPage({ onLogin }) {
     setError('');
   };
 
-  const handleSendOTP = async (e) => {
-    e.preventDefault();
+  const handleSendOTP = async () => {
     setError('');
     setPhoneError('');
 
@@ -90,271 +122,282 @@ export function LoginPage({ onLogin }) {
     }
 
     if (!isValidIraqPhone(phone)) {
-      setPhoneError('Only Iraq numbers allowed');
+      setPhoneError('Invalid phone number. Use Iraq format: +964XXXXXXXXXX');
       return;
     }
 
-    setLoading(true);
-    try {
-      // Normalize phone before sending to backend
-      const normalizedPhone = normalizeIraqPhone(phone);
-      const response = await axios.post(`${BASE_URL}/api/auth/send-otp`, {
-        phone: normalizedPhone
-      });
-
-      if (response.data.success) {
-        setOtpSent(true);
-        setResendCooldown(30);
-        // Auto-fill OTP from response (for dev/testing)
-        if (response.data.otp) {
-          setOtp(response.data.otp);
-        } else {
-          setOtp('');
-        }
-      }
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to send OTP. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    // For mock OTP, we don't need to call backend - just show OTP input
+    setOtpSent(true);
+    setOtp('1234'); // Auto-fill mock OTP
   };
 
-  const handleResendOTP = async () => {
-    if (resendCooldown > 0) return;
-
-    setLoading(true);
-    setError('');
-    try {
-      // Normalize phone before sending to backend
-      const normalizedPhone = normalizeIraqPhone(phone);
-      const response = await axios.post(`${BASE_URL}/api/auth/send-otp`, {
-        phone: normalizedPhone
-      });
-
-      if (response.data.success) {
-        setResendCooldown(30);
-        // Auto-fill OTP from response (for dev/testing)
-        if (response.data.otp) {
-          setOtp(response.data.otp);
-        } else {
-          setOtp('');
-        }
-      }
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to resend OTP. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOTP = async (e) => {
-    e.preventDefault();
-    setError('');
-
-    if (!otp || otp.length !== 6) {
-      setError('Please enter a valid 6-digit OTP');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Normalize phone before sending to backend
-      const normalizedPhone = normalizeIraqPhone(phone);
-      const response = await axios.post(`${BASE_URL}/api/auth/verify-otp`, {
-        phone: normalizedPhone,
-        otp: otp
-      });
-
-      if (response.data.success && response.data.token) {
-        localStorage.setItem('token', response.data.token);
-        onLogin(selectedRole);
-        // Redirect to dashboard
-        window.location.href = '/';
-      }
-    } catch (err) {
-      const errorMessage = err.response?.data?.error || 'Invalid or expired OTP. Please try again.';
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return React.createElement("div", {
-    className: "min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 flex items-center justify-center p-4"
-  }, React.createElement("div", {
-    className: "w-full max-w-md"
-  }, React.createElement("div", {
-    className: "text-center mb-8"
-  }, React.createElement("div", {
-    className: "inline-flex w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl items-center justify-center mb-4"
-  }, React.createElement("span", {
-    className: "text-white text-2xl"
-  }, "BM")), React.createElement("h1", {
-    className: "text-gray-900 dark:text-white mb-2"
-  }, "BidMaster Admin Panel"), React.createElement("p", {
-    className: "text-sm text-gray-600 dark:text-gray-400"
-  }, "Secure authentication portal")), React.createElement(Card, {
-    className: "shadow-xl"
-  }, React.createElement(CardHeader, null, React.createElement(CardTitle, null, "Admin Login"), React.createElement(CardDescription, null, "Enter your credentials to access the admin panel")), React.createElement(CardContent, null, React.createElement("form", {
-    onSubmit: otpSent ? handleVerifyOTP : handleSendOTP,
-    className: "space-y-4"
-  }, React.createElement("div", {
-    className: "space-y-2"
-  }, React.createElement(Label, {
-    htmlFor: "phone"
-  }, "Phone Number"), React.createElement("div", {
-    className: "relative"
-  }, React.createElement(Phone, {
-    className: "absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
-  }), React.createElement(Input, {
-    id: "phone",
-    type: "tel",
-    placeholder: "+9647701234567",
-    className: "pl-10",
-    value: phone,
-    onChange: handlePhoneChange,
-    required: true,
-    disabled: otpSent || loading
-  })), phoneError && React.createElement("p", {
-    className: "text-sm text-red-600 dark:text-red-400"
-  }, phoneError)), !otpSent ? React.createElement(React.Fragment, null, React.createElement("div", {
-    className: "space-y-2"
-  }, React.createElement(Label, null, "Select Role"), React.createElement("div", {
-    className: "grid grid-cols-1 gap-2"
-  }, React.createElement("button", {
-    type: "button",
-    onClick: () => setSelectedRole('super-admin'),
-    className: "p-3 rounded-lg border-2 transition-all text-left " + (selectedRole === 'super-admin' ? "border-blue-600 bg-blue-50 dark:bg-blue-950" : "border-gray-200 dark:border-gray-800 hover:border-blue-300")
-  }, React.createElement("div", {
-    className: "flex items-center gap-3"
-  }, React.createElement("div", {
-className: "w-8 h-8 rounded-lg flex items-center justify-center " + (selectedRole === 'super-admin' ? "bg-blue-600" : "bg-gray-200 dark:bg-gray-700")
-  }, React.createElement(Shield, {
-    className: `h-4 w-4 ${selectedRole === 'super-admin' ? 'text-white' : 'text-gray-600'}`
-  })), React.createElement("div", {
-    className: "flex-1"
-  }, React.createElement("p", {
-    className: "text-sm"
-  }, "Super Admin"), React.createElement("p", {
-    className: "text-xs text-gray-500"
-  }, "Full access to all features")), selectedRole === 'super-admin' && React.createElement("div", {
-    className: "w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center"
-  }, React.createElement("div", {
-    className: "w-2 h-2 bg-white rounded-full"
-  })))), React.createElement("button", {
-    type: "button",
-    onClick: () => setSelectedRole('moderator'),
-    className: `p-3 rounded-lg border-2 transition-all text-left ${selectedRole === 'moderator' ? 'border-purple-600 bg-purple-50 dark:bg-purple-950' : 'border-gray-200 dark:border-gray-800 hover:border-purple-300'}`
-  }, React.createElement("div", {
-    className: "flex items-center gap-3"
-  }, React.createElement("div", {
-    className: `w-8 h-8 rounded-lg flex items-center justify-center ${selectedRole === 'moderator' ? 'bg-purple-600' : 'bg-gray-200 dark:bg-gray-700'}`
-  }, React.createElement(Users, {
-    className: `h-4 w-4 ${selectedRole === 'moderator' ? 'text-white' : 'text-gray-600'}`
-  })), React.createElement("div", {
-    className: "flex-1"
-  }, React.createElement("p", {
-    className: "text-sm"
-  }, "Moderator"), React.createElement("p", {
-    className: "text-xs text-gray-500"
-  }, "Manage users, products & orders")), selectedRole === 'moderator' && React.createElement("div", {
-    className: "w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center"
-  }, React.createElement("div", {
-    className: "w-2 h-2 bg-white rounded-full"
-  })))), React.createElement("button", {
-    type: "button",
-    onClick: () => setSelectedRole('viewer'),
-    className: `p-3 rounded-lg border-2 transition-all text-left ${selectedRole === 'viewer' ? 'border-green-600 bg-green-50 dark:bg-green-950' : 'border-gray-200 dark:border-gray-800 hover:border-green-300'}`
-  }, React.createElement("div", {
-    className: "flex items-center gap-3"
-  }, React.createElement("div", {
-    className: `w-8 h-8 rounded-lg flex items-center justify-center ${selectedRole === 'viewer' ? 'bg-green-600' : 'bg-gray-200 dark:bg-gray-700'}`
-  }, React.createElement(EyeIcon, {
-    className: `h-4 w-4 ${selectedRole === 'viewer' ? 'text-white' : 'text-gray-600'}`
-  })), React.createElement("div", {
-    className: "flex-1"
-  }, React.createElement("p", {
-    className: "text-sm"
-  }, "Viewer"), React.createElement("p", {
-    className: "text-xs text-gray-500"
-  }, "Read-only access to analytics")), selectedRole === 'viewer' && React.createElement("div", {
-    className: "w-5 h-5 bg-green-600 rounded-full flex items-center justify-center"
-  }, React.createElement("div", {
-    className: "w-2 h-2 bg-white rounded-full"
-  })))))), React.createElement("div", {
-    className: "flex items-center justify-between"
-  }, React.createElement("div", {
-    className: "flex items-center gap-2"
-  }, React.createElement(Checkbox, {
-    id: "remember"
-  }), React.createElement(Label, {
-    htmlFor: "remember",
-    className: "text-sm cursor-pointer"
-  }, "Remember me")), React.createElement("a", {
-    href: "#",
-    className: "text-sm text-blue-600 hover:underline"
-  }, "Forgot password?")), React.createElement("div", {
-    className: "flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950 rounded-lg"
-  }, React.createElement(Lock, {
-    className: "h-4 w-4 text-green-600"
-  }), React.createElement("span", {
-    className: "text-xs text-green-700 dark:text-green-400"
-  }, "Secured with JWT Authentication & HTTPS")), React.createElement(Button, {
-    type: "submit",
-className: "w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700",
-disabled: loading
-}, loading ? "Sending..." : "Send OTP"))
- : React.createElement(React.Fragment, null, React.createElement("div", {
-    className: "space-y-2"
-  }, React.createElement(Label, {
-    htmlFor: "otp"
-  }, "Enter OTP"), React.createElement(Input, {
-    id: "otp",
-    type: "text",
-    placeholder: "123456",
-    className: "text-center text-lg tracking-widest",
-    value: otp,
-    onChange: (e) => {
-      const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+  const handleOTPChange = (e) => {
+    const value = e.target.value.replace(/\D/g, ''); // Only digits
+    if (value.length <= 4) {
       setOtp(value);
       setError('');
-    },
-    maxLength: 6,
-    required: true,
-    disabled: loading
-  }), React.createElement("p", {
-    className: "text-xs text-gray-500 dark:text-gray-400 text-center"
-  }, "OTP sent. Check your SMS or backend console for the code.")), React.createElement("div", {
-    className: "flex items-center justify-between"
-  }, React.createElement("button", {
-    type: "button",
-    onClick: handleResendOTP,
-    disabled: resendCooldown > 0 || loading,
-    className: `text-sm ${resendCooldown > 0 ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600 hover:underline'}`
-  }, resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : "Resend OTP"), React.createElement("button", {
-    type: "button",
-    onClick: () => {
-      setOtpSent(false);
-      setOtp('');
-      setError('');
-    },
-    className: "text-sm text-blue-600 hover:underline"
-  }, "Change Phone")), error && React.createElement("div", {
-    className: "p-3 bg-red-50 dark:bg-red-950 rounded-lg"
-  }, React.createElement("p", {
-    className: "text-sm text-red-600 dark:text-red-400"
-  }, error)), React.createElement(Button, {
-    type: "submit",
-    className: "w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700",
-    disabled: loading
-  }, loading ? "Verifying..." : "Verify OTP"))), React.createElement("div", {
-    className: "mt-4 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg"
-  }, React.createElement("p", {
-    className: "text-xs text-blue-700 dark:text-blue-400"
-  }, "💡 Two-factor authentication available in Settings")))), React.createElement("p", {
-    className: "text-center text-xs text-gray-500 mt-6"
-  }, "Protected by BidMaster Security © 2025")));
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    setError('');
+
+    if (!otp || otp.length !== 4) {
+      setError('Please enter 4-digit OTP');
+      return;
+    }
+
+    if (otp !== '1234') {
+      setError('Invalid OTP. Use 1234 for testing.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const normalizedPhone = normalizeIraqPhone(phone);
+      
+      // Call backend login-phone endpoint
+      const response = await fetch(`${BASE_URL}/auth/login-phone`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone: normalizedPhone,
+          otp: otp
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Login failed');
+      }
+
+      if (data.success && data.token) {
+        // Store token in localStorage
+        localStorage.setItem('token', data.token);
+        
+        // Extract role from response
+        const role = data.role || data.user?.role;
+        
+        // Map backend role to frontend format
+        const mappedRole = role === 'superadmin' ? 'super-admin' : role;
+        
+        // Call onLogin with role and token
+        onLogin(mappedRole, data.token);
+        
+        // Redirect based on role
+        if (role === 'superadmin') {
+          window.location.hash = 'dashboard';
+        } else if (role === 'moderator') {
+          window.location.hash = 'moderator-dashboard';
+        } else if (role === 'viewer') {
+          window.location.hash = 'viewer-dashboard';
+        } else {
+          window.location.hash = 'dashboard';
+        }
+      } else {
+        throw new Error(data.message || 'Login failed');
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      setError(err.message || 'Login failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBack = () => {
+    setOtpSent(false);
+    setOtp('');
+    setError('');
+    setPhoneError('');
+  };
+
+  // Get role display name for OTP screen
+  const getRoleDisplayName = () => {
+    if (!selectedRole) return 'Admin';
+    if (selectedRole === 'superadmin') return 'Super Admin';
+    if (selectedRole === 'moderator') return 'Moderator';
+    if (selectedRole === 'viewer') return 'Viewer';
+    return 'Admin';
+  };
+
+  // Get role color class for title
+  const getRoleColorClass = () => {
+    if (!selectedRole) return 'text-gray-900 dark:text-white';
+    if (selectedRole === 'superadmin') return 'text-blue-600 dark:text-blue-400';
+    if (selectedRole === 'moderator') return 'text-purple-600 dark:text-purple-400';
+    if (selectedRole === 'viewer') return 'text-green-600 dark:text-green-400';
+    return 'text-gray-900 dark:text-white';
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4">
+      <Card className="w-full max-w-md shadow-xl">
+        <CardHeader className="space-y-1 text-center">
+          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center mb-4">
+            <Shield className="h-8 w-8 text-white" />
+          </div>
+          <CardTitle className={`text-2xl font-bold ${otpSent ? getRoleColorClass() : 'text-gray-900 dark:text-white'}`}>
+            BidMaster {otpSent ? getRoleDisplayName() : 'Admin'}
+          </CardTitle>
+          <CardDescription>
+            {otpSent ? 'Enter OTP to continue' : 'Login with your phone number'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!otpSent ? (
+            <>
+              {/* Role Selection Cards */}
+              <div className="space-y-2">
+                <Label>Select Role</Label>
+                <div className="grid grid-cols-1 gap-2">
+                  {roles.map((role) => {
+                    const Icon = role.icon;
+                    const isSelected = selectedRole === role.id;
+                    const colorClasses = {
+                      blue: isSelected 
+                        ? 'border-blue-600 bg-blue-50 dark:bg-blue-950' 
+                        : 'border-gray-200 dark:border-gray-800 hover:border-blue-300',
+                      purple: isSelected 
+                        ? 'border-purple-600 bg-purple-50 dark:bg-purple-950' 
+                        : 'border-gray-200 dark:border-gray-800 hover:border-purple-300',
+                      green: isSelected 
+                        ? 'border-green-600 bg-green-50 dark:bg-green-950' 
+                        : 'border-gray-200 dark:border-gray-800 hover:border-green-300'
+                    };
+                    const iconColorClasses = {
+                      blue: isSelected ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700',
+                      purple: isSelected ? 'bg-purple-600' : 'bg-gray-200 dark:bg-gray-700',
+                      green: isSelected ? 'bg-green-600' : 'bg-gray-200 dark:bg-gray-700'
+                    };
+                    const checkColorClasses = {
+                      blue: 'bg-blue-600',
+                      purple: 'bg-purple-600',
+                      green: 'bg-green-600'
+                    };
+
+                    return (
+                      <button
+                        key={role.id}
+                        type="button"
+                        onClick={() => handleRoleSelect(role)}
+                        className={`p-3 rounded-lg border-2 transition-all text-left ${colorClasses[role.color]}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${iconColorClasses[role.color]}`}>
+                            <Icon className={`h-4 w-4 ${isSelected ? 'text-white' : 'text-gray-600'}`} />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">{role.label}</p>
+                            <p className="text-xs text-gray-500">{role.subtitle}</p>
+                          </div>
+                          {isSelected && (
+                            <div className={`w-5 h-5 ${checkColorClasses[role.color]} rounded-full flex items-center justify-center`}>
+                              <div className="w-2 h-2 bg-white rounded-full" />
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone Number (Iraq)</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="+9647701234567"
+                    className="pl-10"
+                    value={phone}
+                    onChange={handlePhoneChange}
+                    required
+                    disabled={loading}
+                  />
+                </div>
+                {phoneError && (
+                  <p className="text-sm text-red-600 dark:text-red-400">{phoneError}</p>
+                )}
+                {selectedRole && (
+                  <p className="text-xs text-gray-500">
+                    Phone auto-filled for {roles.find(r => r.id === selectedRole)?.label}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                <KeyRound className="h-4 w-4 text-blue-600" />
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  <strong>Mock OTP:</strong> Use <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">1234</code> for testing
+                </p>
+              </div>
+
+              <Button
+                onClick={handleSendOTP}
+                className="w-full"
+                disabled={loading || !phone || !selectedRole}
+              >
+                Send OTP
+              </Button>
+            </>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="otp">Enter OTP</Label>
+                <div className="relative">
+                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="otp"
+                    type="text"
+                    placeholder="1234"
+                    className="pl-10 text-center text-2xl tracking-widest"
+                    value={otp}
+                    onChange={handleOTPChange}
+                    maxLength={4}
+                    required
+                    disabled={loading}
+                    autoFocus
+                  />
+                </div>
+                <p className="text-xs text-gray-500 text-center">
+                  Enter the 4-digit OTP (Mock: 1234)
+                </p>
+              </div>
+
+              {error && (
+                <div className="p-3 bg-red-50 dark:bg-red-950 rounded-lg">
+                  <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleBack}
+                  className="flex-1"
+                  disabled={loading}
+                >
+                  Back
+                </Button>
+                <Button
+                  onClick={handleVerifyOTP}
+                  className="flex-1"
+                  disabled={loading || otp.length !== 4}
+                >
+                  {loading ? 'Verifying...' : 'Verify OTP'}
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
-
-
-

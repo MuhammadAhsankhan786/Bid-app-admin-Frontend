@@ -11,17 +11,42 @@ import { AnalyticsPage } from './pages/AnalyticsPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { Toaster } from './components/ui/sonner';
+import { getRoleFromToken } from './utils/roleUtils';
+import { hasPageAccess } from './utils/roleAccess';
 import React from 'react';
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return !!localStorage.getItem('token');
   });
-  const [userRole, setUserRole] = useState('super-admin');
+  
+  // Extract role from token on mount
+  const [userRole, setUserRole] = useState(() => {
+    const token = localStorage.getItem('token');
+    const role = getRoleFromToken(token);
+    // Map backend role names to frontend format
+    if (role === 'superadmin') return 'super-admin';
+    return role || 'super-admin';
+  });
   
   // Get current page from URL hash, default to 'dashboard'
   const getPageFromHash = () => {
     const hash = window.location.hash.replace('#', '');
-    const validPages = ['dashboard', 'users', 'products', 'orders', 'analytics', 'notifications', 'settings'];
+    const validPages = [
+      'dashboard', 
+      'moderator-dashboard', 
+      'viewer-dashboard',
+      'users', 
+      'products', 
+      'orders', 
+      'analytics', 
+      'notifications', 
+      'settings'
+    ];
+    // Map role-specific dashboards to main dashboard
+    if (hash === 'moderator-dashboard' || hash === 'viewer-dashboard') {
+      return 'dashboard';
+    }
     return validPages.includes(hash) ? hash : 'dashboard';
   };
   
@@ -45,20 +70,81 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
   
-  const handleLogin = role => {
-    setUserRole(role);
+  const handleLogin = (role, token) => {
+    // Extract role from token if provided, otherwise use passed role
+    const extractedRole = token ? getRoleFromToken(token) : role;
+    // Map backend role names to frontend format
+    const mappedRole = extractedRole === 'superadmin' ? 'super-admin' : (extractedRole || role);
+    setUserRole(mappedRole);
     setIsAuthenticated(true);
+    
+    // Redirect based on role (handled by LoginPage, but ensure hash is set)
+    const hash = window.location.hash.replace('#', '');
+    if (!hash || hash === 'login') {
+      // If no hash set, default based on role
+      if (extractedRole === 'superadmin') {
+        window.location.hash = 'dashboard';
+      } else if (extractedRole === 'moderator') {
+        window.location.hash = 'moderator-dashboard';
+      } else if (extractedRole === 'viewer') {
+        window.location.hash = 'viewer-dashboard';
+      } else {
+        window.location.hash = 'dashboard';
+      }
+    }
   };
+  
+  // Update role when token changes
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      const role = getRoleFromToken(token);
+      if (role) {
+        const mappedRole = role === 'superadmin' ? 'super-admin' : role;
+        setUserRole(mappedRole);
+      }
+    }
+  }, [isAuthenticated]);
   const handleNavigate = page => {
     if (page === 'login') {
       setIsAuthenticated(false);
+      localStorage.removeItem('token');
     } else {
+      // Check if user has access to this page
+      const normalizedRole = userRole === 'superadmin' ? 'super-admin' : userRole;
+      if (!hasPageAccess(normalizedRole, page)) {
+        // Redirect to dashboard if no access
+        console.warn(`Access denied: ${normalizedRole} cannot access ${page}`);
+        setCurrentPage('dashboard');
+        window.location.hash = 'dashboard';
+        return;
+      }
       setCurrentPage(page);
       // Update URL hash
       window.location.hash = page;
     }
     setIsMobileSidebarOpen(false);
   };
+  
+  // Protect routes on page load
+  useEffect(() => {
+    if (isAuthenticated) {
+      const normalizedRole = userRole === 'superadmin' ? 'super-admin' : userRole;
+      const currentHash = window.location.hash.replace('#', '');
+      
+      // Map role-specific dashboards
+      const actualPage = currentHash === 'moderator-dashboard' || currentHash === 'viewer-dashboard' 
+        ? 'dashboard' 
+        : currentHash;
+      
+      if (actualPage && !hasPageAccess(normalizedRole, actualPage)) {
+        // Redirect to dashboard if no access
+        console.warn(`Access denied: ${normalizedRole} cannot access ${actualPage}`);
+        setCurrentPage('dashboard');
+        window.location.hash = 'dashboard';
+      }
+    }
+  }, [isAuthenticated, userRole]);
   if (!isAuthenticated) {
     return /*#__PURE__*/React.createElement(ThemeProvider, null, /*#__PURE__*/React.createElement(LoginPage, {
       onLogin: handleLogin
@@ -89,18 +175,37 @@ export default function App() {
     className: "flex-1 flex flex-col overflow-hidden"
   }, /*#__PURE__*/React.createElement(TopNavbar, {
     onNavigate: handleNavigate,
-    onToggleMobileSidebar: () => setIsMobileSidebarOpen(!isMobileSidebarOpen)
+    onToggleMobileSidebar: () => setIsMobileSidebarOpen(!isMobileSidebarOpen),
+    userRole: userRole
   }), /*#__PURE__*/React.createElement("main", {
     className: "flex-1 overflow-y-auto p-4 md:p-6"
-  }, currentPage === 'dashboard' && /*#__PURE__*/React.createElement(DashboardPage, {
-    userRole: userRole
-  }), currentPage === 'users' && /*#__PURE__*/React.createElement(UserManagementPage, {
-    userRole: userRole
-  }), currentPage === 'products' && /*#__PURE__*/React.createElement(ProductManagementPage, {
-    userRole: userRole
-  }), currentPage === 'orders' && /*#__PURE__*/React.createElement(OrderManagementPage, {
-    userRole: userRole
-  }), currentPage === 'analytics' && /*#__PURE__*/React.createElement(AnalyticsPage, null), currentPage === 'notifications' && /*#__PURE__*/React.createElement(NotificationsPage, null), currentPage === 'settings' && /*#__PURE__*/React.createElement(SettingsPage, {
-    userRole: userRole
-  })))), /*#__PURE__*/React.createElement(Toaster, null));
+  }, (() => {
+    const normalizedRole = userRole === 'superadmin' ? 'super-admin' : userRole;
+    
+    // Route protection - only render if user has access
+    if (currentPage === 'dashboard' && hasPageAccess(normalizedRole, 'dashboard')) {
+      return /*#__PURE__*/React.createElement(DashboardPage, { userRole: userRole });
+    }
+    if (currentPage === 'users' && hasPageAccess(normalizedRole, 'users')) {
+      return /*#__PURE__*/React.createElement(UserManagementPage, { userRole: userRole });
+    }
+    if (currentPage === 'products' && hasPageAccess(normalizedRole, 'products')) {
+      return /*#__PURE__*/React.createElement(ProductManagementPage, { userRole: userRole });
+    }
+    if (currentPage === 'orders' && hasPageAccess(normalizedRole, 'orders')) {
+      return /*#__PURE__*/React.createElement(OrderManagementPage, { userRole: userRole });
+    }
+    if (currentPage === 'analytics' && hasPageAccess(normalizedRole, 'analytics')) {
+      return /*#__PURE__*/React.createElement(AnalyticsPage, null);
+    }
+    if (currentPage === 'notifications' && hasPageAccess(normalizedRole, 'notifications')) {
+      return /*#__PURE__*/React.createElement(NotificationsPage, null);
+    }
+    if (currentPage === 'settings' && hasPageAccess(normalizedRole, 'settings')) {
+      return /*#__PURE__*/React.createElement(SettingsPage, { userRole: userRole });
+    }
+    
+    // Default to dashboard if no access or unknown page
+    return /*#__PURE__*/React.createElement(DashboardPage, { userRole: userRole });
+  })()))), /*#__PURE__*/React.createElement(Toaster, null));
 }

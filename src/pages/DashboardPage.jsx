@@ -8,8 +8,15 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { apiService } from '../services/api';
 import { toast } from 'sonner';
 import { PageLoader } from '../components/Loader';
+import { hasModuleAccess, canWrite, isReadOnly } from '../utils/roleAccess';
 
-export function DashboardPage() {
+export function DashboardPage({ userRole }) {
+  const normalizedRole = userRole === 'superadmin' ? 'super-admin' : userRole;
+  const canViewAnalytics = hasModuleAccess(normalizedRole, 'Analytics');
+  const canViewPayments = hasModuleAccess(normalizedRole, 'Payments');
+  const canViewUsers = hasModuleAccess(normalizedRole, 'Users');
+  const canViewPendingProducts = hasModuleAccess(normalizedRole, 'Products') && !isReadOnly(normalizedRole);
+  const isReadOnlyUser = isReadOnly(normalizedRole);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     users: "0",
@@ -29,12 +36,24 @@ export function DashboardPage() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const [dashboard, charts, categories, pending] = await Promise.all([
+      
+      // Build array of promises conditionally based on role
+      const promises = [
         apiService.getDashboard(),
         apiService.getDashboardCharts('week'),
-        apiService.getDashboardCategories(),
-        apiService.getPendingProducts()
-      ]);
+        apiService.getDashboardCategories()
+      ];
+      
+      // Only fetch pending products if user has access (not for viewers)
+      if (canViewPendingProducts) {
+        promises.push(apiService.getPendingProducts());
+      }
+      
+      const results = await Promise.all(promises);
+      const dashboard = results[0];
+      const charts = results[1];
+      const categories = results[2];
+      const pending = canViewPendingProducts ? results[3] : [];
 
       setStats({
         users: dashboard.stats?.users || "0",
@@ -135,27 +154,31 @@ export function DashboardPage() {
     "div",
     { className: "space-y-6" },
 
-    React.createElement(
+      React.createElement(
       "div",
       null,
       React.createElement("h1", { className: "text-gray-900 dark:text-white mb-1" }, "Dashboard Overview"),
-      React.createElement("p", { className: "text-sm text-gray-600 dark:text-gray-400" }, "Welcome back, Super Admin")
+      React.createElement("p", { className: "text-sm text-gray-600 dark:text-gray-400" }, 
+        `Welcome back, ${normalizedRole === 'super-admin' || normalizedRole === 'superadmin' ? 'Super Admin' : 
+          normalizedRole === 'moderator' ? 'Moderator' : 
+          normalizedRole === 'viewer' ? 'Viewer' : 'Admin'}`
+      )
     ),
 
     React.createElement(
       "div",
       { className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" },
-      React.createElement(StatsCard, { title: "Total Users", value: stats.users, change: "+12.5% from last month", changeType: "positive", icon: Users, iconColor: "bg-blue-500" }),
+      canViewUsers && React.createElement(StatsCard, { title: "Total Users", value: stats.users, change: "+12.5% from last month", changeType: "positive", icon: Users, iconColor: "bg-blue-500" }),
       React.createElement(StatsCard, { title: "Active Auctions", value: stats.activeAuctions, change: "+8.2% from last week", changeType: "positive", icon: Package, iconColor: "bg-purple-500" }),
       React.createElement(StatsCard, { title: "Completed Bids", value: stats.completedBids, change: "+23.1% from last month", changeType: "positive", icon: Activity, iconColor: "bg-green-500" }),
-      React.createElement(StatsCard, { title: "Total Revenue", value: stats.revenue, change: "+15.3% from last month", changeType: "positive", icon: DollarSign, iconColor: "bg-orange-500" })
+      canViewPayments && React.createElement(StatsCard, { title: "Total Revenue", value: stats.revenue, change: "+15.3% from last month", changeType: "positive", icon: DollarSign, iconColor: "bg-orange-500" })
     ),
 
     React.createElement(
       "div",
       { className: "grid grid-cols-1 lg:grid-cols-3 gap-6" },
 
-      React.createElement(
+      canViewAnalytics && React.createElement(
         Card,
         { className: "lg:col-span-2" },
         React.createElement(CardHeader, null,
@@ -180,7 +203,7 @@ export function DashboardPage() {
         )
       ),
 
-      React.createElement(
+      canViewAnalytics && React.createElement(
         Card,
         null,
         React.createElement(CardHeader, null,

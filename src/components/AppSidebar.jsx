@@ -2,44 +2,45 @@ import { LayoutDashboard, Users, Package, ShoppingCart, BarChart3, Bell, Setting
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
+import { hasModuleAccess } from '../utils/roleAccess';
 import React from 'react';
 
 const navItems = [{
   id: 'dashboard',
   label: 'Dashboard',
   icon: LayoutDashboard,
-  roles: ['super-admin', 'moderator', 'viewer']
+  roles: ['super-admin', 'superadmin', 'moderator', 'viewer']
 }, {
   id: 'users',
   label: 'User Management',
   icon: Users,
-  roles: ['super-admin', 'moderator']
+  roles: ['super-admin', 'superadmin', 'moderator']
 }, {
   id: 'products',
   label: 'Products & Auctions',
   icon: Package,
-  roles: ['super-admin', 'moderator']
+  roles: ['super-admin', 'superadmin', 'moderator', 'viewer']
 }, {
   id: 'orders',
   label: 'Orders & Transactions',
   icon: ShoppingCart,
-  roles: ['super-admin', 'moderator']
+  roles: ['super-admin', 'superadmin', 'moderator']
 }, {
   id: 'analytics',
   label: 'Analytics & Reports',
   icon: BarChart3,
-  roles: ['super-admin', 'moderator', 'viewer']
+  roles: ['super-admin', 'superadmin', 'viewer']
 }, {
   id: 'notifications',
   label: 'Notifications & Logs',
   icon: Bell,
-  roles: ['super-admin', 'moderator']
+  roles: ['super-admin', 'superadmin', 'moderator', 'viewer']
 }];
 const bottomItems = [{
   id: 'settings',
   label: 'Settings',
   icon: Settings,
-  roles: ['super-admin']
+  roles: ['super-admin', 'superadmin']
 }];
 export function AppSidebar({
   currentPage,
@@ -49,7 +50,10 @@ export function AppSidebar({
   userRole
 }) {
   const getRoleBadge = () => {
-    switch (userRole) {
+    // Normalize role (handle both 'super-admin' and 'superadmin')
+    const normalizedRole = userRole === 'superadmin' ? 'super-admin' : userRole;
+    
+    switch (normalizedRole) {
       case 'super-admin':
         return {
           label: 'Super Admin',
@@ -65,8 +69,37 @@ export function AppSidebar({
           label: 'Viewer',
           color: 'bg-green-600'
         };
+      default:
+        return {
+          label: 'Admin',
+          color: 'bg-gray-600'
+        };
     }
   };
+  
+  // Filter nav items based on user role using roleAccess utility
+  const normalizedUserRole = userRole === 'superadmin' ? 'super-admin' : userRole;
+  
+  // Map page IDs to module labels for access checking
+  const pageToModule = {
+    'dashboard': 'Dashboard',
+    'users': 'Users',
+    'products': 'Products',
+    'orders': 'Orders',
+    'analytics': 'Analytics',
+    'notifications': 'Notifications',
+    'settings': 'Settings'
+  };
+  
+  const filteredNavItems = navItems.filter(item => {
+    const moduleLabel = pageToModule[item.id];
+    return moduleLabel && hasModuleAccess(normalizedUserRole, moduleLabel);
+  });
+  
+  const filteredBottomItems = bottomItems.filter(item => {
+    const moduleLabel = pageToModule[item.id];
+    return moduleLabel && hasModuleAccess(normalizedUserRole, moduleLabel);
+  });
   const roleBadge = getRoleBadge();
   return /*#__PURE__*/React.createElement("div", {
     className: `h-screen bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 flex flex-col transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'}`
@@ -99,7 +132,7 @@ export function AppSidebar({
     className: "flex-1 px-3 py-4"
   }, /*#__PURE__*/React.createElement("div", {
     className: "space-y-1"
-  }, navItems.filter(item => item.roles.includes(userRole)).map(item => {
+  }, filteredNavItems.map(item => {
     const Icon = item.icon;
     const isActive = currentPage === item.id;
     return /*#__PURE__*/React.createElement("button", {
@@ -115,7 +148,7 @@ export function AppSidebar({
     className: "my-4"
   }), /*#__PURE__*/React.createElement("div", {
     className: "space-y-1"
-  }, bottomItems.filter(item => item.roles.includes(userRole)).map(item => {
+  }, filteredBottomItems.map(item => {
     const Icon = item.icon;
     return /*#__PURE__*/React.createElement("button", {
       key: item.id,

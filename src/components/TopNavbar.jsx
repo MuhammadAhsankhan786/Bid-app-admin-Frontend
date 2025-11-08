@@ -7,14 +7,43 @@ import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import React from 'react';
 
+import { getRoleFromToken } from '../utils/roleUtils';
+
 export function TopNavbar({
   onNavigate,
-  onToggleMobileSidebar
+  onToggleMobileSidebar,
+  userRole
 }) {
   const {
     theme,
     toggleTheme
   } = useTheme();
+  
+  // Get role display info
+  const getRoleInfo = () => {
+    const normalizedRole = userRole === 'superadmin' ? 'super-admin' : userRole;
+    
+    const roleDisplay = {
+      'super-admin': 'Super Admin',
+      'superadmin': 'Super Admin',
+      'moderator': 'Moderator',
+      'viewer': 'Viewer'
+    };
+    
+    const roleColors = {
+      'super-admin': 'bg-blue-600 text-white',
+      'superadmin': 'bg-blue-600 text-white',
+      'moderator': 'bg-purple-600 text-white',
+      'viewer': 'bg-green-600 text-white'
+    };
+    
+    return {
+      label: roleDisplay[normalizedRole] || 'Admin',
+      color: roleColors[normalizedRole] || 'bg-gray-600 text-white'
+    };
+  };
+  
+  const roleInfo = getRoleInfo();
   return /*#__PURE__*/React.createElement("div", {
     className: "h-16 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 md:px-6"
   }, /*#__PURE__*/React.createElement("div", {

@@ -56,6 +56,21 @@ export const apiService = {
     return response.data;
   },
 
+  async createUser(userData) {
+    const response = await api.post('/admin/users', userData);
+    return response.data;
+  },
+
+  async updateUser(id, userData) {
+    const response = await api.put(`/admin/users/${id}`, userData);
+    return response.data;
+  },
+
+  async updateUserRole(id, role) {
+    const response = await api.put(`/admin/users/${id}/role`, { role });
+    return response.data;
+  },
+
   async deleteUser(id) {
     const response = await api.delete(`/admin/users/${id}`);
     return response.data;
@@ -89,6 +104,11 @@ export const apiService = {
 
   async getProductById(id) {
     const response = await api.get(`/admin/products/${id}`);
+    return response.data;
+  },
+
+  async getProductDocuments(id) {
+    const response = await api.get(`/admin/products/${id}/documents`);
     return response.data;
   },
 
@@ -136,6 +156,29 @@ export const apiService = {
 
   async getTopProducts() {
     const response = await api.get('/admin/analytics/top-products');
+    return response.data;
+  },
+
+  // Auctions
+  async getActiveAuctions() {
+    const response = await api.get('/admin/auctions/active');
+    return response.data;
+  },
+
+  async getAuctionBids(id) {
+    const response = await api.get(`/admin/auctions/${id}/bids`);
+    return response.data;
+  },
+
+  // Notifications
+  async getNotifications(params = {}) {
+    const response = await api.get('/admin/notifications', { params });
+    return response.data;
+  },
+
+  // Payments
+  async getPayments(params = {}) {
+    const response = await api.get('/admin/payments', { params });
     return response.data;
   },
 };
