@@ -36,6 +36,7 @@ import {
 import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
 import { toast } from "sonner";
+import { getScopeFromToken } from "../utils/roleUtils";
 
 export function SettingsPage({ userRole }) {
   const normalizedRole =
@@ -104,6 +105,28 @@ export function SettingsPage({ userRole }) {
       formData.append("logo", file);
 
       const token = localStorage.getItem("token");
+      
+      // Validate token scope before making request
+      if (token) {
+        const scope = getScopeFromToken(token);
+        
+        // If scope is "mobile", clear storage and reject
+        if (scope === 'mobile') {
+          console.warn('⚠️ [Admin Panel] Mobile-scope token detected in SettingsPage. Clearing storage.');
+          localStorage.removeItem('token');
+          window.location.href = '/';
+          throw new Error('Invalid token scope. Please login again.');
+        }
+        
+        // Only allow tokens with scope="admin" or no scope (backward compatibility)
+        if (scope && scope !== 'admin') {
+          console.warn('⚠️ [Admin Panel] Invalid token scope in SettingsPage:', scope);
+          localStorage.removeItem('token');
+          window.location.href = '/';
+          throw new Error('Invalid token scope. Please login again.');
+        }
+      }
+      
       let baseURL = "http://localhost:5000/api";
       if (typeof import.meta !== "undefined" && import.meta.env) {
         baseURL =
@@ -148,6 +171,28 @@ export function SettingsPage({ userRole }) {
       const loadCurrentLogo = async () => {
         try {
           const token = localStorage.getItem("token");
+          
+          // Validate token scope before making request
+          if (token) {
+            const scope = getScopeFromToken(token);
+            
+            // If scope is "mobile", clear storage and reject
+            if (scope === 'mobile') {
+              console.warn('⚠️ [Admin Panel] Mobile-scope token detected in SettingsPage. Clearing storage.');
+              localStorage.removeItem('token');
+              window.location.href = '/';
+              return;
+            }
+            
+            // Only allow tokens with scope="admin" or no scope (backward compatibility)
+            if (scope && scope !== 'admin') {
+              console.warn('⚠️ [Admin Panel] Invalid token scope in SettingsPage:', scope);
+              localStorage.removeItem('token');
+              window.location.href = '/';
+              return;
+            }
+          }
+          
           let baseURL = "http://localhost:5000/api";
           if (typeof import.meta !== "undefined" && import.meta.env) {
             baseURL =

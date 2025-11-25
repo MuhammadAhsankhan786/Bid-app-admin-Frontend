@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Phone, Shield, KeyRound, Users, Eye as EyeIcon } from 'lucide-react';
+import { Phone, Shield, Users, Eye as EyeIcon } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { apiService } from '../services/api';
+import { getScopeFromToken } from '../utils/roleUtils';
 import React from 'react';
 
 const BASE_URL = import.meta.env.VITE_BASE_URL || import.meta.env.REACT_APP_BASE_URL || 'http://localhost:5000/api';
@@ -56,17 +57,18 @@ function isValidIraqPhone(phone) {
 export function LoginPage({ onLogin }) {
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otp, setOtp] = useState('');
   const [selectedRole, setSelectedRole] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Mock phone numbers for each role
+  // Phone numbers for each role - These should match the actual numbers in the database
+  // Admin Panel uses /api/auth/admin-login which looks up users by phone + role from database
+  // Users must enter the actual phone number stored in the database for their role
   const rolePhones = {
-    'superadmin': '+9647701234567',
-    'moderator': '+9647701234568',
-    'viewer': '+9647701234569'
+    // These are placeholder examples - users should enter their actual database phone numbers
+    'superadmin': '',
+    'moderator': '',
+    'viewer': ''
   };
 
   const roles = [
@@ -98,11 +100,10 @@ export function LoginPage({ onLogin }) {
 
   const handleRoleSelect = (role) => {
     setSelectedRole(role.id);
-    setPhone(role.phone);
+    // Don't auto-fill phone - user must enter their actual database phone number
+    setPhone('');
     setPhoneError('');
     setError('');
-    setOtpSent(false);
-    setOtp('');
   };
 
   const handlePhoneChange = (e) => {
@@ -112,7 +113,7 @@ export function LoginPage({ onLogin }) {
     setError('');
   };
 
-  const handleSendOTP = async () => {
+  const handleLogin = async () => {
     setError('');
     setPhoneError('');
 
@@ -121,34 +122,13 @@ export function LoginPage({ onLogin }) {
       return;
     }
 
+    if (!selectedRole) {
+      setError('Please select a role');
+      return;
+    }
+
     if (!isValidIraqPhone(phone)) {
       setPhoneError('Invalid phone number. Use Iraq format: +964XXXXXXXXXX');
-      return;
-    }
-
-    // For mock OTP, we don't need to call backend - just show OTP input
-    setOtpSent(true);
-    setOtp('1234'); // Auto-fill mock OTP
-  };
-
-  const handleOTPChange = (e) => {
-    const value = e.target.value.replace(/\D/g, ''); // Only digits
-    if (value.length <= 4) {
-      setOtp(value);
-      setError('');
-    }
-  };
-
-  const handleVerifyOTP = async () => {
-    setError('');
-
-    if (!otp || otp.length !== 4) {
-      setError('Please enter 4-digit OTP');
-      return;
-    }
-
-    if (otp !== '1234') {
-      setError('Invalid OTP. Use 1234 for testing.');
       return;
     }
 
@@ -157,15 +137,15 @@ export function LoginPage({ onLogin }) {
     try {
       const normalizedPhone = normalizeIraqPhone(phone);
       
-      // Call backend login-phone endpoint
-      const response = await fetch(`${BASE_URL}/auth/login-phone`, {
+      // Call POST /auth/admin-login with phone + role (NO OTP)
+      const response = await fetch(`${BASE_URL}/auth/admin-login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           phone: normalizedPhone,
-          otp: otp
+          role: selectedRole
         })
       });
 
@@ -176,24 +156,50 @@ export function LoginPage({ onLogin }) {
       }
 
       if (data.success && data.token) {
+        // Extract role from response
+        const role = data.role || data.user?.role;
+        const normalizedRole = role?.toLowerCase();
+        
+        // Check if user has admin role (superadmin, admin, moderator, viewer)
+        const adminRoles = ['superadmin', 'admin', 'moderator', 'viewer'];
+        if (!normalizedRole || !adminRoles.includes(normalizedRole)) {
+          console.error('❌ [Admin Panel] Non-admin user attempted login. Role:', normalizedRole);
+          localStorage.removeItem('token');
+          throw new Error('Access denied. Admin panel is only for administrators. Your account role does not have admin access.');
+        }
+        
+        // Verify token scope is "admin" before storing
+        const tokenScope = getScopeFromToken(data.token);
+        
+        // If scope is "mobile", reject login and clear any existing token
+        if (tokenScope === 'mobile') {
+          console.error('❌ [Admin Panel] Mobile-scope token received. Admin panel requires admin-scope token.');
+          localStorage.removeItem('token');
+          throw new Error('Invalid token scope. Admin panel requires admin login. Please use admin credentials.');
+        }
+        
+        // Only allow tokens with scope="admin" or no scope (backward compatibility)
+        if (tokenScope && tokenScope !== 'admin') {
+          console.error('❌ [Admin Panel] Invalid token scope:', tokenScope);
+          localStorage.removeItem('token');
+          throw new Error('Invalid token scope. Please contact administrator.');
+        }
+        
         // Store token in localStorage
         localStorage.setItem('token', data.token);
         
-        // Extract role from response
-        const role = data.role || data.user?.role;
-        
         // Map backend role to frontend format
-        const mappedRole = role === 'superadmin' ? 'super-admin' : role;
+        const mappedRole = normalizedRole === 'superadmin' ? 'super-admin' : normalizedRole;
         
         // Call onLogin with role and token
         onLogin(mappedRole, data.token);
         
         // Redirect based on role
-        if (role === 'superadmin') {
+        if (normalizedRole === 'superadmin') {
           window.location.hash = 'dashboard';
-        } else if (role === 'moderator') {
+        } else if (normalizedRole === 'moderator') {
           window.location.hash = 'moderator-dashboard';
-        } else if (role === 'viewer') {
+        } else if (normalizedRole === 'viewer') {
           window.location.hash = 'viewer-dashboard';
         } else {
           window.location.hash = 'dashboard';
@@ -209,14 +215,7 @@ export function LoginPage({ onLogin }) {
     }
   };
 
-  const handleBack = () => {
-    setOtpSent(false);
-    setOtp('');
-    setError('');
-    setPhoneError('');
-  };
-
-  // Get role display name for OTP screen
+  // Get role display name
   const getRoleDisplayName = () => {
     if (!selectedRole) return 'Admin';
     if (selectedRole === 'superadmin') return 'Super Admin';
@@ -241,161 +240,108 @@ export function LoginPage({ onLogin }) {
           <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center mb-4">
             <Shield className="h-8 w-8 text-white" />
           </div>
-          <CardTitle className={`text-2xl font-bold ${otpSent ? getRoleColorClass() : 'text-gray-900 dark:text-white'}`}>
-            BidMaster {otpSent ? getRoleDisplayName() : 'Admin'}
+          <CardTitle className={`text-2xl font-bold ${getRoleColorClass()}`}>
+            BidMaster {getRoleDisplayName()}
           </CardTitle>
           <CardDescription>
-            {otpSent ? 'Enter OTP to continue' : 'Login with your phone number'}
+            Login with your phone number and role
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!otpSent ? (
-            <>
-              {/* Role Selection Cards */}
-              <div className="space-y-2">
-                <Label>Select Role</Label>
-                <div className="grid grid-cols-1 gap-2">
-                  {roles.map((role) => {
-                    const Icon = role.icon;
-                    const isSelected = selectedRole === role.id;
-                    const colorClasses = {
-                      blue: isSelected 
-                        ? 'border-blue-600 bg-blue-50 dark:bg-blue-950' 
-                        : 'border-gray-200 dark:border-gray-800 hover:border-blue-300',
-                      purple: isSelected 
-                        ? 'border-purple-600 bg-purple-50 dark:bg-purple-950' 
-                        : 'border-gray-200 dark:border-gray-800 hover:border-purple-300',
-                      green: isSelected 
-                        ? 'border-green-600 bg-green-50 dark:bg-green-950' 
-                        : 'border-gray-200 dark:border-gray-800 hover:border-green-300'
-                    };
-                    const iconColorClasses = {
-                      blue: isSelected ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700',
-                      purple: isSelected ? 'bg-purple-600' : 'bg-gray-200 dark:bg-gray-700',
-                      green: isSelected ? 'bg-green-600' : 'bg-gray-200 dark:bg-gray-700'
-                    };
-                    const checkColorClasses = {
-                      blue: 'bg-blue-600',
-                      purple: 'bg-purple-600',
-                      green: 'bg-green-600'
-                    };
+          {/* Role Selection Cards */}
+          <div className="space-y-2">
+            <Label>Select Role</Label>
+            <div className="grid grid-cols-1 gap-2">
+              {roles.map((role) => {
+                const Icon = role.icon;
+                const isSelected = selectedRole === role.id;
+                const colorClasses = {
+                  blue: isSelected 
+                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-950' 
+                    : 'border-gray-200 dark:border-gray-800 hover:border-blue-300',
+                  purple: isSelected 
+                    ? 'border-purple-600 bg-purple-50 dark:bg-purple-950' 
+                    : 'border-gray-200 dark:border-gray-800 hover:border-purple-300',
+                  green: isSelected 
+                    ? 'border-green-600 bg-green-50 dark:bg-green-950' 
+                    : 'border-gray-200 dark:border-gray-800 hover:border-green-300'
+                };
+                const iconColorClasses = {
+                  blue: isSelected ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700',
+                  purple: isSelected ? 'bg-purple-600' : 'bg-gray-200 dark:bg-gray-700',
+                  green: isSelected ? 'bg-green-600' : 'bg-gray-200 dark:bg-gray-700'
+                };
+                const checkColorClasses = {
+                  blue: 'bg-blue-600',
+                  purple: 'bg-purple-600',
+                  green: 'bg-green-600'
+                };
 
-                    return (
-                      <button
-                        key={role.id}
-                        type="button"
-                        onClick={() => handleRoleSelect(role)}
-                        className={`p-3 rounded-lg border-2 transition-all text-left ${colorClasses[role.color]}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${iconColorClasses[role.color]}`}>
-                            <Icon className={`h-4 w-4 ${isSelected ? 'text-white' : 'text-gray-600'}`} />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">{role.label}</p>
-                            <p className="text-xs text-gray-500">{role.subtitle}</p>
-                          </div>
-                          {isSelected && (
-                            <div className={`w-5 h-5 ${checkColorClasses[role.color]} rounded-full flex items-center justify-center`}>
-                              <div className="w-2 h-2 bg-white rounded-full" />
-                            </div>
-                          )}
+                return (
+                  <button
+                    key={role.id}
+                    type="button"
+                    onClick={() => handleRoleSelect(role)}
+                    className={`p-3 rounded-lg border-2 transition-all text-left ${colorClasses[role.color]}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${iconColorClasses[role.color]}`}>
+                        <Icon className={`h-4 w-4 ${isSelected ? 'text-white' : 'text-gray-600'}`} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{role.label}</p>
+                        <p className="text-xs text-gray-500">{role.subtitle}</p>
+                      </div>
+                      {isSelected && (
+                        <div className={`w-5 h-5 ${checkColorClasses[role.color]} rounded-full flex items-center justify-center`}>
+                          <div className="w-2 h-2 bg-white rounded-full" />
                         </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number (Iraq)</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone Number (Iraq)</Label>
+            <div className="relative">
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     id="phone"
                     type="tel"
-                    placeholder="+9647701234567"
+                    placeholder="Enter your admin phone number"
                     className="pl-10"
                     value={phone}
                     onChange={handlePhoneChange}
                     required
                     disabled={loading}
                   />
-                </div>
+            </div>
                 {phoneError && (
                   <p className="text-sm text-red-600 dark:text-red-400">{phoneError}</p>
                 )}
                 {selectedRole && (
                   <p className="text-xs text-gray-500">
-                    Phone auto-filled for {roles.find(r => r.id === selectedRole)?.label}
+                    Enter the phone number registered in the database for {roles.find(r => r.id === selectedRole)?.label}
                   </p>
                 )}
-              </div>
+          </div>
 
-              <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
-                <KeyRound className="h-4 w-4 text-blue-600" />
-                <p className="text-xs text-blue-700 dark:text-blue-300">
-                  <strong>Mock OTP:</strong> Use <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">1234</code> for testing
-                </p>
-              </div>
-
-              <Button
-                onClick={handleSendOTP}
-                className="w-full"
-                disabled={loading || !phone || !selectedRole}
-              >
-                Send OTP
-              </Button>
-            </>
-          ) : (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="otp">Enter OTP</Label>
-                <div className="relative">
-                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="otp"
-                    type="text"
-                    placeholder="1234"
-                    className="pl-10 text-center text-2xl tracking-widest"
-                    value={otp}
-                    onChange={handleOTPChange}
-                    maxLength={4}
-                    required
-                    disabled={loading}
-                    autoFocus
-                  />
-                </div>
-                <p className="text-xs text-gray-500 text-center">
-                  Enter the 4-digit OTP (Mock: 1234)
-                </p>
-              </div>
-
-              {error && (
-                <div className="p-3 bg-red-50 dark:bg-red-950 rounded-lg">
-                  <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={handleBack}
-                  className="flex-1"
-                  disabled={loading}
-                >
-                  Back
-                </Button>
-                <Button
-                  onClick={handleVerifyOTP}
-                  className="flex-1"
-                  disabled={loading || otp.length !== 4}
-                >
-                  {loading ? 'Verifying...' : 'Verify OTP'}
-                </Button>
-              </div>
-            </>
+          {error && (
+            <div className="p-3 bg-red-50 dark:bg-red-950 rounded-lg">
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            </div>
           )}
+
+          <Button
+            onClick={handleLogin}
+            className="w-full"
+            disabled={loading || !phone || !selectedRole}
+          >
+            {loading ? 'Logging in...' : 'Login'}
+          </Button>
         </CardContent>
       </Card>
     </div>

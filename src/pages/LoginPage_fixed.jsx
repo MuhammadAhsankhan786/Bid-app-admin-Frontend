@@ -276,7 +276,7 @@ export function LoginPage({ onLogin }) {
   }, "Enter OTP"), React.createElement(Input, {
     id: "otp",
     type: "text",
-    placeholder: "123456",
+    placeholder: "Enter OTP",
     className: "text-center text-lg tracking-widest",
     value: otp,
     onChange: (e) => {
@@ -289,7 +289,7 @@ export function LoginPage({ onLogin }) {
     disabled: loading
   }), React.createElement("p", {
     className: "text-xs text-gray-500 dark:text-gray-400 text-center"
-  }, "Mock OTP = 123456 (Development Only)")), React.createElement("div", {
+  })), React.createElement("div", {
     className: "flex items-center justify-between"
   }, React.createElement("button", {
     type: "button",

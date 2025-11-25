@@ -11,22 +11,46 @@ import { AnalyticsPage } from './pages/AnalyticsPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { Toaster } from './components/ui/sonner';
-import { getRoleFromToken } from './utils/roleUtils';
+import { getRoleFromToken, getScopeFromToken } from './utils/roleUtils';
 import { hasPageAccess } from './utils/roleAccess';
 import React from 'react';
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return !!localStorage.getItem('token');
-  });
-  
-  // Extract role from token on mount
+  // Extract role from token on mount and validate scope
+  // This runs first to validate scope before setting isAuthenticated
   const [userRole, setUserRole] = useState(() => {
     const token = localStorage.getItem('token');
+    
+    // Validate token scope - Admin Panel only accepts scope="admin" or no scope (backward compatibility)
+    if (token) {
+      const scope = getScopeFromToken(token);
+      
+      // If scope is "mobile", clear storage and force re-login
+      if (scope === 'mobile') {
+        console.warn('⚠️ [Admin Panel] Mobile-scope token detected on mount. Clearing storage.');
+        localStorage.removeItem('token');
+        // Will trigger re-render and show login page
+        return null;
+      }
+      
+      // Only allow tokens with scope="admin" or no scope (backward compatibility)
+      if (scope && scope !== 'admin') {
+        console.warn('⚠️ [Admin Panel] Invalid token scope on mount:', scope);
+        localStorage.removeItem('token');
+        return null;
+      }
+    }
+    
     const role = getRoleFromToken(token);
     // Map backend role names to frontend format
     if (role === 'superadmin') return 'super-admin';
     return role || 'super-admin';
+  });
+  
+  // Set isAuthenticated based on token presence AFTER scope validation
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    // Re-check token after scope validation (token may have been cleared)
+    return !!localStorage.getItem('token');
   });
   
   // Get current page from URL hash, default to 'dashboard'
@@ -94,10 +118,31 @@ export default function App() {
     }
   };
   
-  // Update role when token changes
+  // Update role when token changes and validate scope
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
+      // Validate token scope
+      const scope = getScopeFromToken(token);
+      
+      // If scope is "mobile", clear storage and force re-login
+      if (scope === 'mobile') {
+        console.warn('⚠️ [Admin Panel] Mobile-scope token detected. Clearing storage.');
+        localStorage.removeItem('token');
+        setIsAuthenticated(false);
+        window.location.href = '/';
+        return;
+      }
+      
+      // Only allow tokens with scope="admin" or no scope (backward compatibility)
+      if (scope && scope !== 'admin') {
+        console.warn('⚠️ [Admin Panel] Invalid token scope:', scope);
+        localStorage.removeItem('token');
+        setIsAuthenticated(false);
+        window.location.href = '/';
+        return;
+      }
+      
       const role = getRoleFromToken(token);
       if (role) {
         const mappedRole = role === 'superadmin' ? 'super-admin' : role;

@@ -117,3 +117,59 @@ export const getRoleDisplayName = (role) => {
   return roleMap[role?.toLowerCase()] || role || 'Unknown';
 };
 
+/**
+ * Decode JWT token to extract scope
+ * @param {string} token - JWT token
+ * @returns {string|null} - Token scope or null if invalid
+ */
+export const getScopeFromToken = (token) => {
+  if (!token) return null;
+  
+  try {
+    // JWT is base64url encoded, split by dots
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    
+    // Decode payload (second part)
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    
+    // Extract scope
+    return payload.scope || null;
+  } catch (error) {
+    console.error('Error decoding token scope:', error);
+    return null;
+  }
+};
+
+/**
+ * Decode JWT token to extract both role and scope
+ * @param {string} token - JWT token
+ * @returns {{role: string|null, scope: string|null}} - User role and scope
+ */
+export const getRoleAndScopeFromToken = (token) => {
+  if (!token) return { role: null, scope: null };
+  
+  try {
+    // JWT is base64url encoded, split by dots
+    const parts = token.split('.');
+    if (parts.length !== 3) return { role: null, scope: null };
+    
+    // Decode payload (second part)
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    
+    // Extract role and normalize (map legacy 'admin' to 'superadmin')
+    let role = payload.role?.toLowerCase();
+    if (role === 'admin') {
+      role = 'superadmin';
+    }
+    
+    // Extract scope
+    const scope = payload.scope || null;
+    
+    return { role: role || null, scope };
+  } catch (error) {
+    console.error('Error decoding token:', error);
+    return { role: null, scope: null };
+  }
+};
+

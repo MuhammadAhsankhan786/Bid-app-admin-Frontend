@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getScopeFromToken } from '../utils/roleUtils';
 
 // Use local API for development, production API for deployment
 // Set VITE_BASE_URL=http://localhost:5000/api in .env for local development
@@ -12,10 +13,31 @@ const api = axios.create({
   },
 });
 
-// Add auth token to requests
+// Add auth token to requests with scope validation
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
+    // Verify token scope is "admin" (or undefined for backward compatibility)
+    const scope = getScopeFromToken(token);
+    
+    // If scope is "mobile", clear storage and force re-login
+    if (scope === 'mobile') {
+      console.warn('⚠️ [Admin Panel] Mobile-scope token detected. Clearing storage and forcing re-login.');
+      localStorage.removeItem('token');
+      // Redirect to login page
+      window.location.href = '/';
+      // Reject the request
+      return Promise.reject(new Error('Mobile token detected. Admin panel requires admin-scope token.'));
+    }
+    
+    // Only allow tokens with scope="admin" or no scope (backward compatibility)
+    if (scope && scope !== 'admin') {
+      console.warn('⚠️ [Admin Panel] Invalid token scope:', scope);
+      localStorage.removeItem('token');
+      window.location.href = '/';
+      return Promise.reject(new Error('Invalid token scope for admin panel.'));
+    }
+    
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
@@ -119,6 +141,16 @@ export const apiService = {
 
   async rejectProduct(id, data = {}) {
     const response = await api.patch(`/admin/products/reject/${id}`, data);
+    return response.data;
+  },
+
+  async updateProduct(id, data) {
+    const response = await api.put(`/admin/products/${id}`, data);
+    return response.data;
+  },
+
+  async deleteProduct(id) {
+    const response = await api.delete(`/admin/products/${id}`);
     return response.data;
   },
 
