@@ -1,4 +1,5 @@
-import { Bell, Activity, Mail, Shield, CheckCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Bell, Activity, Mail, Shield, CheckCircle, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Switch } from '../components/ui/switch';
@@ -13,24 +14,101 @@ import {
   TableHeader,
   TableRow,
 } from '../components/ui/table';
+import { apiService } from '../../src/services/api';
 
-const notifications = [
-  { id: 1, type: 'product', title: 'New Product Submitted', message: 'Vintage Camera by John Doe awaits approval', time: '5 min ago', read: false },
-  { id: 2, type: 'user', title: 'User Reported', message: 'User Mike Johnson has been reported for suspicious activity', time: '15 min ago', read: false },
-  { id: 3, type: 'bid', title: 'High-Value Bid Alert', message: 'Bid of $5,000 placed on Antique Painting', time: '1 hour ago', read: false },
-  { id: 4, type: 'system', title: 'System Update', message: 'Platform maintenance scheduled for tonight', time: '2 hours ago', read: true },
-  { id: 5, type: 'payment', title: 'Payment Completed', message: 'Transaction #ORD-1005 successfully processed', time: '3 hours ago', read: true },
-];
+interface Notification {
+  id: number;
+  type: string;
+  title: string;
+  message: string;
+  time: string;
+  read: boolean;
+}
 
-const activityLog = [
-  { id: 1, admin: 'Super Admin', action: 'Approved product: Gaming Laptop', timestamp: '2025-10-16 14:23:45', ip: '192.168.1.1' },
-  { id: 2, admin: 'Moderator', action: 'Suspended user: Mike Johnson', timestamp: '2025-10-16 13:15:22', ip: '192.168.1.2' },
-  { id: 3, admin: 'Super Admin', action: 'Modified user role: Jane Smith to Seller', timestamp: '2025-10-16 12:45:10', ip: '192.168.1.1' },
-  { id: 4, admin: 'Moderator', action: 'Flagged auction: Suspicious Listing #234', timestamp: '2025-10-16 11:30:05', ip: '192.168.1.2' },
-  { id: 5, admin: 'Super Admin', action: 'Exported analytics report', timestamp: '2025-10-16 10:15:33', ip: '192.168.1.1' },
-];
+interface ActivityLog {
+  id: number;
+  admin: string;
+  action: string;
+  timestamp: string;
+  ip: string;
+}
 
 export function NotificationsPage() {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [activityLog, setActivityLog] = useState<ActivityLog[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadNotifications();
+    loadActivityLog();
+  }, []);
+
+  const loadNotifications = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await apiService.getNotifications();
+      
+      if (response.success && response.data) {
+        const notifs = Array.isArray(response.data) ? response.data : response.data.notifications || [];
+        setNotifications(notifs.map((n: any) => ({
+          id: n.id,
+          type: n.type || 'system',
+          title: n.title || 'Notification',
+          message: n.message || '',
+          time: n.created_at ? formatTimeAgo(n.created_at) : 'N/A',
+          read: n.read || false,
+        })));
+      } else {
+        setError(response.message || 'Failed to load notifications');
+      }
+    } catch (err: any) {
+      console.error('Error loading notifications:', err);
+      setError(err.response?.data?.message || 'Failed to load notifications');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadActivityLog = async () => {
+    try {
+      const response = await apiService.getActivityLog();
+      
+      if (response.success && response.data) {
+        const logs = Array.isArray(response.data) ? response.data : response.data.logs || [];
+        setActivityLog(logs.map((log: any) => ({
+          id: log.id,
+          admin: log.admin_name || log.admin || 'Unknown',
+          action: log.action || '',
+          timestamp: log.created_at ? new Date(log.created_at).toLocaleString() : 'N/A',
+          ip: log.ip_address || log.ip || 'N/A',
+        })));
+      }
+    } catch (err) {
+      console.error('Error loading activity log:', err);
+    }
+  };
+
+  const formatTimeAgo = (dateString: string): string => {
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diff = now.getTime() - date.getTime();
+      const minutes = Math.floor(diff / (1000 * 60));
+      const hours = Math.floor(minutes / 60);
+      const days = Math.floor(hours / 24);
+
+      if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
+      if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+      if (minutes > 0) return `${minutes} min ago`;
+      return 'Just now';
+    } catch {
+      return dateString;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -65,14 +143,44 @@ export function NotificationsPage() {
                   <CardTitle>All Notifications</CardTitle>
                   <CardDescription>Recent platform alerts and updates</CardDescription>
                 </div>
-                <button className="text-sm text-blue-600 hover:underline">
-                  Mark all as read
-                </button>
+                <div className="flex gap-2">
+                  <button 
+                    className="text-sm text-blue-600 hover:underline"
+                    onClick={loadNotifications}
+                  >
+                    <RefreshCw className={`h-4 w-4 inline ${isLoading ? 'animate-spin' : ''}`} />
+                  </button>
+                  <button className="text-sm text-blue-600 hover:underline">
+                    Mark all as read
+                  </button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {notifications.map((notification) => (
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+                  <span className="ml-2 text-gray-600 dark:text-gray-400">Loading notifications...</span>
+                </div>
+              ) : error ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Bell className="h-12 w-12 text-red-500 mb-4" />
+                  <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
+                  <button 
+                    className="text-sm text-blue-600 hover:underline"
+                    onClick={loadNotifications}
+                  >
+                    Try Again
+                  </button>
+                </div>
+              ) : notifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Bell className="h-12 w-12 text-gray-400 mb-4" />
+                  <p className="text-gray-600 dark:text-gray-400">No notifications</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {notifications.map((notification) => (
                   <div
                     key={notification.id}
                     className={`p-4 rounded-lg border transition-all hover:shadow-md ${
@@ -106,8 +214,9 @@ export function NotificationsPage() {
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -120,17 +229,23 @@ export function NotificationsPage() {
               <CardDescription>Complete audit trail of admin actions</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Admin</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead>Timestamp</TableHead>
-                    <TableHead>IP Address</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {activityLog.map((log) => (
+              {activityLog.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Activity className="h-12 w-12 text-gray-400 mb-4" />
+                  <p className="text-gray-600 dark:text-gray-400">No activity log entries</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Admin</TableHead>
+                      <TableHead>Action</TableHead>
+                      <TableHead>Timestamp</TableHead>
+                      <TableHead>IP Address</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {activityLog.map((log) => (
                     <TableRow key={log.id}>
                       <TableCell>
                         <Badge variant="outline">{log.admin}</Badge>
@@ -143,9 +258,10 @@ export function NotificationsPage() {
                         {log.ip}
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

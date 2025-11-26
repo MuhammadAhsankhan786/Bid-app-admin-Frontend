@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Search, Filter, Download, MoreVertical, Eye, UserX, UserCheck, Edit, Shield, Lock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Filter, Download, MoreVertical, Eye, UserX, UserCheck, Edit, Shield, Lock, UserPlus, DollarSign, RefreshCw, Users } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
@@ -37,22 +37,82 @@ import { Label } from '../components/ui/label';
 import { Avatar, AvatarFallback } from '../components/ui/avatar';
 import { UserRole } from './LoginPage';
 import { toast } from 'sonner@2.0.3';
+import { apiService } from '../../src/services/api';
 
-const users = [
-  { id: 1, name: 'John Doe', email: 'john@example.com', role: 'Buyer', status: 'Active', joined: '2024-01-15', bids: 45 },
-  { id: 2, name: 'Jane Smith', email: 'jane@example.com', role: 'Seller', status: 'Active', joined: '2024-02-20', bids: 32 },
-  { id: 3, name: 'Mike Johnson', email: 'mike@example.com', role: 'Buyer', status: 'Suspended', joined: '2024-03-10', bids: 12 },
-  { id: 4, name: 'Sarah Williams', email: 'sarah@example.com', role: 'Seller', status: 'Active', joined: '2024-01-05', bids: 89 },
-  { id: 5, name: 'Tom Brown', email: 'tom@example.com', role: 'Buyer', status: 'Pending', joined: '2024-10-14', bids: 3 },
-];
+// User interface with referral fields
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  joined: string;
+  bids?: number;
+  referral_code?: string;
+  referred_by?: string;
+  reward_balance?: number;
+  showAdjustModal?: boolean;
+}
 
 interface UserManagementPageProps {
   userRole: UserRole;
 }
 
 export function UserManagementPage({ userRole }: UserManagementPageProps) {
-  const [selectedUser, setSelectedUser] = useState<typeof users[0] | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isAdjustBalanceModalOpen, setIsAdjustBalanceModalOpen] = useState(false);
+  const [adjustAmount, setAdjustAmount] = useState('');
+  const [adjustReason, setAdjustReason] = useState('');
+  const [isAdjusting, setIsAdjusting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  useEffect(() => {
+    loadUsers();
+  }, [searchQuery, roleFilter, statusFilter]);
+
+  const loadUsers = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const params: any = {};
+      if (searchQuery) params.search = searchQuery;
+      if (roleFilter !== 'all') params.role = roleFilter;
+      if (statusFilter !== 'all') params.status = statusFilter;
+
+      const response = await apiService.getUsers(params);
+      
+      if (response.success && response.data) {
+        const usersData = Array.isArray(response.data) ? response.data : response.data.users || [];
+        setUsers(usersData.map((user: any) => ({
+          id: user.id,
+          name: user.name || `${user.phone || 'User'}`,
+          email: user.email || '',
+          role: user.role || 'buyer',
+          status: user.status === 'approved' ? 'Active' : user.status === 'suspended' ? 'Suspended' : 'Pending',
+          joined: user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A',
+          bids: user.total_bids || 0,
+          referral_code: user.referral_code,
+          referred_by: user.referred_by,
+          reward_balance: user.reward_balance || 0,
+        })));
+      } else {
+        setError(response.message || 'Failed to load users');
+      }
+    } catch (err: any) {
+      console.error('Error loading users:', err);
+      setError(err.response?.data?.message || 'Failed to load users');
+      toast.error('Failed to load users');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const isReadOnly = userRole === 'viewer';
 
@@ -97,9 +157,14 @@ export function UserManagementPage({ userRole }: UserManagementPageProps) {
           <div className="flex flex-col md:flex-row gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input placeholder="Search by name or email..." className="pl-10" />
+              <Input 
+                placeholder="Search by name or email..." 
+                className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
-            <Select defaultValue="all">
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
               <SelectTrigger className="w-full md:w-40">
                 <SelectValue placeholder="Role" />
               </SelectTrigger>
@@ -110,20 +175,20 @@ export function UserManagementPage({ userRole }: UserManagementPageProps) {
                 <SelectItem value="admin">Admin</SelectItem>
               </SelectContent>
             </Select>
-            <Select defaultValue="all">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full md:w-40">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="approved">Active</SelectItem>
                 <SelectItem value="suspended">Suspended</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline">
-              <Filter className="h-4 w-4 mr-2" />
-              Filters
+            <Button variant="outline" onClick={loadUsers} disabled={isLoading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              Refresh
             </Button>
           </div>
         </CardContent>
@@ -133,23 +198,43 @@ export function UserManagementPage({ userRole }: UserManagementPageProps) {
       <Card>
         <CardHeader>
           <CardTitle>All Users</CardTitle>
-          <CardDescription>Total: {users.length} users</CardDescription>
+          <CardDescription>
+            {isLoading ? 'Loading...' : `Total: ${users.length} users`}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Joined</TableHead>
-                  <TableHead>Total Bids</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+              <span className="ml-2 text-gray-600 dark:text-gray-400">Loading users...</span>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
+              <Button variant="outline" onClick={loadUsers}>
+                Try Again
+              </Button>
+            </div>
+          ) : users.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <Users className="h-12 w-12 text-gray-400 mb-4" />
+              <p className="text-gray-600 dark:text-gray-400">No users found</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Joined</TableHead>
+                    <TableHead>Total Bids</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user) => (
                   <TableRow key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-900">
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -229,10 +314,11 @@ export function UserManagementPage({ userRole }: UserManagementPageProps) {
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
 
           {/* Pagination */}
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
@@ -307,6 +393,44 @@ export function UserManagementPage({ userRole }: UserManagementPageProps) {
                   <p className="text-sm">{selectedUser.bids}</p>
                 </div>
               </div>
+
+              {/* Referral Section */}
+              <div className="border-t border-gray-200 dark:border-gray-800 pt-4 mt-4">
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <UserPlus className="h-4 w-4" />
+                  Referral Information
+                </h3>
+                <div className="grid grid-cols-2 gap-4 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                  <div>
+                    <p className="text-sm text-gray-500">Referral Code</p>
+                    <p className="text-sm font-mono font-semibold">{selectedUser.referral_code || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Referred By</p>
+                    <p className="text-sm">{selectedUser.referred_by || 'None'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-sm text-gray-500">Reward Balance</p>
+                    <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                      ${parseFloat(selectedUser.reward_balance || 0).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+                {(userRole === 'super-admin' || userRole === 'moderator') && (
+                  <div className="mt-4">
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        setIsAdjustBalanceModalOpen(true);
+                      }}
+                    >
+                      <DollarSign className="h-4 w-4 mr-2" />
+                      Adjust Reward Balance
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
           <DialogFooter>
@@ -314,6 +438,116 @@ export function UserManagementPage({ userRole }: UserManagementPageProps) {
               Cancel
             </Button>
             <Button>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Adjust Balance Modal */}
+      <Dialog open={isAdjustBalanceModalOpen} onOpenChange={setIsAdjustBalanceModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adjust Reward Balance</DialogTitle>
+            <DialogDescription>
+              Adjust the reward balance for {selectedUser?.name}. Use positive values to add, negative to deduct.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedUser && (
+            <div className="space-y-4">
+              <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Current Balance:</span>
+                  <span className="text-lg font-semibold text-green-600 dark:text-green-400">
+                    ${parseFloat((selectedUser.reward_balance || 0).toString()).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="adjust-amount">Adjustment Amount ($)</Label>
+                <Input
+                  id="adjust-amount"
+                  type="number"
+                  step="0.01"
+                  placeholder="e.g., -2.00 to deduct, +5.00 to add"
+                  value={adjustAmount}
+                  onChange={(e) => setAdjustAmount(e.target.value)}
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Enter positive value to add, negative value to deduct
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="adjust-reason">Reason (Optional)</Label>
+                <Input
+                  id="adjust-reason"
+                  placeholder="e.g., Fraudulent referral, Manual adjustment"
+                  value={adjustReason}
+                  onChange={(e) => setAdjustReason(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAdjustBalanceModalOpen(false);
+                setAdjustAmount('');
+                setAdjustReason('');
+              }}
+              disabled={isAdjusting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!selectedUser) return;
+
+                const amount = parseFloat(adjustAmount);
+                if (isNaN(amount) || amount === 0) {
+                  toast.error('Please enter a valid adjustment amount');
+                  return;
+                }
+
+                try {
+                  setIsAdjusting(true);
+                  const response = await apiService.adjustUserRewardBalance(selectedUser.id, {
+                    amount,
+                    reason: adjustReason || null
+                  });
+
+                  if (response.success) {
+                    toast.success(`Reward balance adjusted by $${amount.toFixed(2)}`);
+                    setIsAdjustBalanceModalOpen(false);
+                    setAdjustAmount('');
+                    setAdjustReason('');
+                    // Update selectedUser balance
+                    setSelectedUser({
+                      ...selectedUser,
+                      reward_balance: response.data.new_balance
+                    });
+                  } else {
+                    toast.error(response.message || 'Failed to adjust balance');
+                  }
+                } catch (err: any) {
+                  console.error('Error adjusting balance:', err);
+                  toast.error(err.response?.data?.message || 'Failed to adjust balance');
+                } finally {
+                  setIsAdjusting(false);
+                }
+              }}
+              disabled={isAdjusting}
+            >
+              {isAdjusting ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Adjusting...
+                </>
+              ) : (
+                'Adjust Balance'
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

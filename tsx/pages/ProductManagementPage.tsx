@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Search, Clock, CheckCircle, XCircle, Flag, Eye, Timer, Lock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Clock, CheckCircle, XCircle, Flag, Eye, Timer, Lock, RefreshCw, Package } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
@@ -24,29 +24,133 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { UserRole } from './LoginPage';
 import { toast } from 'sonner@2.0.3';
+import { apiService } from '../../src/services/api';
 
-const pendingProducts = [
-  { id: 1, name: 'Vintage Camera', seller: 'John Doe', category: 'Electronics', startingBid: '$150', image: 'camera', submitted: '2 hours ago' },
-  { id: 2, name: 'Designer Watch', seller: 'Jane Smith', category: 'Fashion', startingBid: '$500', image: 'watch', submitted: '5 hours ago' },
-  { id: 3, name: 'Antique Vase', seller: 'Mike Johnson', category: 'Home', startingBid: '$200', image: 'vase', submitted: '1 day ago' },
-];
-
-const liveAuctions = [
-  { id: 1, name: 'Gaming Laptop', currentBid: '$850', highestBidder: 'User#1234', totalBids: 23, timeLeft: '2h 34m', status: 'hot' },
-  { id: 2, name: 'Mountain Bike', currentBid: '$320', highestBidder: 'User#5678', totalBids: 12, timeLeft: '5h 12m', status: 'active' },
-  { id: 3, name: 'Smart Watch', currentBid: '$180', highestBidder: 'User#9012', totalBids: 8, timeLeft: '1h 05m', status: 'ending' },
-  { id: 4, name: 'Leather Jacket', currentBid: '$95', highestBidder: 'User#3456', totalBids: 5, timeLeft: '12h 45m', status: 'active' },
-];
+interface Product {
+  id: number;
+  name: string;
+  seller?: string;
+  category?: string;
+  startingBid?: string;
+  currentBid?: string;
+  highestBidder?: string;
+  totalBids?: number;
+  timeLeft?: string;
+  status?: string;
+  image?: string;
+  image_url?: string;
+  submitted?: string;
+  created_at?: string;
+}
 
 interface ProductManagementPageProps {
   userRole: UserRole;
 }
 
 export function ProductManagementPage({ userRole }: ProductManagementPageProps) {
-  const [selectedProduct, setSelectedProduct] = useState<typeof pendingProducts[0] | null>(null);
+  const [pendingProducts, setPendingProducts] = useState<Product[]>([]);
+  const [liveAuctions, setLiveAuctions] = useState<Product[]>([]);
+  const [isLoadingPending, setIsLoadingPending] = useState(true);
+  const [isLoadingLive, setIsLoadingLive] = useState(true);
+  const [errorPending, setErrorPending] = useState<string | null>(null);
+  const [errorLive, setErrorLive] = useState<string | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('pending');
 
   const isReadOnly = userRole === 'viewer';
+
+  useEffect(() => {
+    if (activeTab === 'pending') {
+      loadPendingProducts();
+    } else {
+      loadLiveAuctions();
+    }
+  }, [activeTab]);
+
+  const loadPendingProducts = async () => {
+    try {
+      setIsLoadingPending(true);
+      setErrorPending(null);
+      
+      const response = await apiService.getPendingProducts();
+      
+      if (response.success && response.data) {
+        const products = Array.isArray(response.data) ? response.data : [];
+        setPendingProducts(products.map((p: any) => ({
+          id: p.id,
+          name: p.title || p.name,
+          seller: p.seller_name || p.seller,
+          category: p.category_name || p.category,
+          startingBid: `$${p.starting_price || p.starting_bid || 0}`,
+          image: p.image_url || p.image,
+          image_url: p.image_url || p.image,
+          submitted: p.created_at ? new Date(p.created_at).toLocaleString() : 'N/A',
+          created_at: p.created_at,
+        })));
+      } else {
+        setErrorPending(response.message || 'Failed to load pending products');
+      }
+    } catch (err: any) {
+      console.error('Error loading pending products:', err);
+      setErrorPending(err.response?.data?.message || 'Failed to load pending products');
+      toast.error('Failed to load pending products');
+    } finally {
+      setIsLoadingPending(false);
+    }
+  };
+
+  const loadLiveAuctions = async () => {
+    try {
+      setIsLoadingLive(true);
+      setErrorLive(null);
+      
+      const response = await apiService.getLiveAuctions();
+      
+      if (response.success && response.data) {
+        const auctions = Array.isArray(response.data) ? response.data : [];
+        setLiveAuctions(auctions.map((a: any) => ({
+          id: a.id,
+          name: a.title || a.name,
+          currentBid: `$${a.current_bid || a.current_price || 0}`,
+          highestBidder: a.highest_bidder || 'N/A',
+          totalBids: a.total_bids || 0,
+          timeLeft: a.time_left || a.end_date ? calculateTimeLeft(a.end_date) : 'N/A',
+          status: a.status || 'active',
+          image: a.image_url || a.image,
+          image_url: a.image_url || a.image,
+        })));
+      } else {
+        setErrorLive(response.message || 'Failed to load live auctions');
+      }
+    } catch (err: any) {
+      console.error('Error loading live auctions:', err);
+      setErrorLive(err.response?.data?.message || 'Failed to load live auctions');
+      toast.error('Failed to load live auctions');
+    } finally {
+      setIsLoadingLive(false);
+    }
+  };
+
+  const calculateTimeLeft = (endDate: string): string => {
+    try {
+      const end = new Date(endDate);
+      const now = new Date();
+      const diff = end.getTime() - now.getTime();
+      
+      if (diff <= 0) return 'Ended';
+      
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      
+      if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+      }
+      return `${minutes}m`;
+    } catch {
+      return 'N/A';
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -69,7 +173,7 @@ export function ProductManagementPage({ userRole }: ProductManagementPageProps) 
         <p className="text-sm text-gray-600 dark:text-gray-400">Manage product approvals and live auctions</p>
       </div>
 
-      <Tabs defaultValue="pending" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="pending" className="gap-2">
             <Clock className="h-4 w-4" />
@@ -98,36 +202,76 @@ export function ProductManagementPage({ userRole }: ProductManagementPageProps) 
           {/* Pending Products Table */}
           <Card>
             <CardHeader>
-              <CardTitle>Products Awaiting Approval</CardTitle>
-              <CardDescription>Review and approve new product listings</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Products Awaiting Approval</CardTitle>
+                  <CardDescription>Review and approve new product listings</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={loadPendingProducts} disabled={isLoadingPending}>
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingPending ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Seller</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Starting Bid</TableHead>
-                    <TableHead>Submitted</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pendingProducts.map((product) => (
-                    <TableRow key={product.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden">
-                            <ImageWithFallback 
-                              src={`https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=100&h=100&fit=crop`}
-                              alt={product.name}
-                              className="w-full h-full object-cover"
-                            />
+              {isLoadingPending ? (
+                <div className="flex items-center justify-center py-12">
+                  <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+                  <span className="ml-2 text-gray-600 dark:text-gray-400">Loading products...</span>
+                </div>
+              ) : errorPending ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <XCircle className="h-12 w-12 text-red-500 mb-4" />
+                  <p className="text-red-600 dark:text-red-400 mb-4">{errorPending}</p>
+                  <Button variant="outline" onClick={loadPendingProducts}>
+                    Try Again
+                  </Button>
+                </div>
+              ) : pendingProducts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Package className="h-12 w-12 text-gray-400 mb-4" />
+                  <p className="text-gray-600 dark:text-gray-400">No pending products</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Product</TableHead>
+                      <TableHead>Seller</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Starting Bid</TableHead>
+                      <TableHead>Submitted</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingProducts.map((product) => (
+                      <TableRow key={product.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden">
+                              {product.image_url || product.image ? (
+                                <ImageWithFallback 
+                                  src={product.image_url || product.image}
+                                  alt={product.name}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    const parent = e.currentTarget.parentElement;
+                                    if (parent) {
+                                      parent.innerHTML = '<div class="w-full h-full flex items-center justify-center"><svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>';
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Package className="w-6 h-6 text-gray-400" />
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-sm">{product.name}</span>
                           </div>
-                          <span className="text-sm">{product.name}</span>
-                        </div>
-                      </TableCell>
+                        </TableCell>
                       <TableCell className="text-sm text-gray-600 dark:text-gray-400">
                         {product.seller}
                       </TableCell>
@@ -247,8 +391,9 @@ export function ProductManagementPage({ userRole }: ProductManagementPageProps) 
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
@@ -261,12 +406,23 @@ export function ProductManagementPage({ userRole }: ProductManagementPageProps) 
           </DialogHeader>
           {selectedProduct && (
             <div className="space-y-4">
-              <div className="aspect-video bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
-                <ImageWithFallback 
-                  src={`https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&h=400&fit=crop`}
-                  alt={selectedProduct.name}
-                  className="w-full h-full object-cover"
-                />
+              <div className="aspect-video bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden flex items-center justify-center">
+                {selectedProduct.image_url || selectedProduct.image ? (
+                  <ImageWithFallback 
+                    src={selectedProduct.image_url || selectedProduct.image}
+                    alt={selectedProduct.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      const parent = e.currentTarget.parentElement;
+                      if (parent) {
+                        parent.innerHTML = '<div class="w-full h-full flex items-center justify-center"><svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>';
+                      }
+                    }}
+                  />
+                ) : (
+                  <Package className="w-16 h-16 text-gray-400" />
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">

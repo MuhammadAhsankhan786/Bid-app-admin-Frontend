@@ -78,8 +78,8 @@ export function AnalyticsPage() {
               <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
               <TrendingUp className="h-4 w-4 text-green-600" />
             </div>
-            <p className="text-gray-900 dark:text-white mb-1">$543,210</p>
-            <p className="text-xs text-green-600">+15.3% from last period</p>
+            <p className="text-gray-900 dark:text-white mb-1">Loading...</p>
+            <p className="text-xs text-green-600">Calculating...</p>
           </CardContent>
         </Card>
 

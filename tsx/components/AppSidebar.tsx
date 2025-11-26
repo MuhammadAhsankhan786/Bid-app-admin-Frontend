@@ -9,7 +9,9 @@ import {
   Lock,
   LogOut,
   ChevronLeft,
-  Shield
+  Shield,
+  UserPlus,
+  Gift
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
@@ -32,6 +34,10 @@ const navItems = [
   { id: 'orders', label: 'Orders & Transactions', icon: ShoppingCart, roles: ['super-admin', 'moderator'] },
   { id: 'analytics', label: 'Analytics & Reports', icon: BarChart3, roles: ['super-admin', 'moderator', 'viewer'] },
   { id: 'notifications', label: 'Notifications & Logs', icon: Bell, roles: ['super-admin', 'moderator'] },
+  { id: 'referrals', label: 'Referral Management', icon: UserPlus, roles: ['super-admin', 'moderator', 'viewer'], subItems: [
+    { id: 'referrals', label: 'Referral Transactions', icon: Gift },
+    { id: 'referral-settings', label: 'Referral Settings', icon: Settings }
+  ] },
 ];
 
 const bottomItems = [
@@ -88,23 +94,55 @@ export function AppSidebar({ currentPage, onNavigate, isCollapsed, onToggleColla
         <div className="space-y-1">
           {navItems.filter(item => item.roles.includes(userRole)).map((item) => {
             const Icon = item.icon;
-            const isActive = currentPage === item.id;
+            const isActive = currentPage === item.id || (item.subItems && item.subItems.some(sub => currentPage === sub.id));
             
             return (
-              <button
-                key={item.id}
-                onClick={() => onNavigate(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${
-                  isActive 
-                    ? 'bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400' 
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900'
-                }`}
-              >
-                <Icon className="h-5 w-5 flex-shrink-0" />
-                {!isCollapsed && (
-                  <span className="text-sm">{item.label}</span>
+              <div key={item.id}>
+                <button
+                  onClick={() => {
+                    // Navigate to first sub-item if exists, otherwise to main item
+                    if (item.subItems && item.subItems.length > 0) {
+                      onNavigate(item.subItems[0].id);
+                    } else {
+                      onNavigate(item.id);
+                    }
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${
+                    isActive 
+                      ? 'bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400' 
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900'
+                  }`}
+                >
+                  <Icon className="h-5 w-5 flex-shrink-0" />
+                  {!isCollapsed && (
+                    <span className="text-sm flex-1 text-left">{item.label}</span>
+                  )}
+                </button>
+                {/* Sub-items for referral management */}
+                {!isCollapsed && item.subItems && isActive && (
+                  <div className="ml-8 mt-1 space-y-1">
+                    {item.subItems.filter(subItem => item.roles.includes(userRole)).map((subItem) => {
+                      const SubIcon = subItem.icon;
+                      const isSubActive = currentPage === subItem.id;
+                      
+                      return (
+                        <button
+                          key={subItem.id}
+                          onClick={() => onNavigate(subItem.id)}
+                          className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all text-sm ${
+                            isSubActive 
+                              ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' 
+                              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900'
+                          }`}
+                        >
+                          <SubIcon className="h-4 w-4 flex-shrink-0" />
+                          <span>{subItem.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
-              </button>
+              </div>
             );
           })}
         </div>

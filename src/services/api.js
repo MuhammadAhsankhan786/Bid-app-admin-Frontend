@@ -72,6 +72,12 @@ export const apiService = {
     return response.data;
   },
 
+  // Orders
+  async getOrderStats() {
+    const response = await api.get('/admin/orders/stats');
+    return response.data;
+  },
+
   // Users
   async getUsers(params = {}) {
     const response = await api.get('/admin/users', { params });
@@ -165,6 +171,11 @@ export const apiService = {
     return response.data;
   },
 
+  async getOrderStats() {
+    const response = await api.get('/admin/orders/stats');
+    return response.data;
+  },
+
   async updateOrderStatus(id, data) {
     const response = await api.patch(`/admin/orders/${id}/status`, data);
     return response.data;
@@ -211,6 +222,32 @@ export const apiService = {
   // Payments
   async getPayments(params = {}) {
     const response = await api.get('/admin/payments', { params });
+    return response.data;
+  },
+
+  // Referrals
+  async getReferrals(params = {}) {
+    const response = await api.get('/admin/referrals', { params });
+    return response.data;
+  },
+
+  async revokeReferral(id) {
+    const response = await api.put(`/admin/referrals/${id}/revoke`);
+    return response.data;
+  },
+
+  async adjustUserRewardBalance(userId, data) {
+    const response = await api.put(`/admin/users/${userId}/adjust-reward`, data);
+    return response.data;
+  },
+
+  async getReferralSettings() {
+    const response = await api.get('/admin/referral/settings');
+    return response.data;
+  },
+
+  async updateReferralSettings(data) {
+    const response = await api.put('/admin/referral/settings', data);
     return response.data;
   },
 };

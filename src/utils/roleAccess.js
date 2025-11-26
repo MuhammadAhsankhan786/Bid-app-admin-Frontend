@@ -14,7 +14,9 @@ const MODULE_TO_PAGE = {
   'Documents': 'products', // Documents are part of products page
   'Notifications': 'notifications',
   'Analytics': 'analytics',
-  'Settings': 'settings'
+  'Settings': 'settings',
+  'Referrals': 'referrals',
+  'ReferralSettings': 'referral-settings'
 };
 
 // Role-based access map
@@ -39,19 +41,23 @@ export const ROLE_ACCESS = {
     'Documents',
     'Notifications',
     'Analytics',
-    'Settings'
+    'Settings',
+    'Referrals',
+    'ReferralSettings'
   ],
   moderator: [
     'Dashboard',
     'Users',
     'Products',
     'Auctions',
-    'Notifications'
+    'Notifications',
+    'Referrals'
   ],
   viewer: [
     'Dashboard',
     'Products',
-    'Auctions'
+    'Auctions',
+    'Referrals'
   ]
 };
 

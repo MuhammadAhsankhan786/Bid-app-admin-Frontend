@@ -533,16 +533,13 @@ export function SettingsPage() {
                         JD
                       </div>
                       <div>
-                        <p className="text-sm">John Doe</p>
-                        <p className="text-xs text-gray-500">john.doe@bidmaster.com</p>
+                        <p className="text-sm">Loading...</p>
+                        <p className="text-xs text-gray-500">Loading admin list...</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary">Moderator</Badge>
-                      <Badge className="bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400">
-                        Active
-                      </Badge>
-                      <Button variant="outline" size="sm">Edit</Button>
+                      <Badge variant="secondary">Loading...</Badge>
+                      <Button variant="outline" size="sm" disabled>Edit</Button>
                     </div>
                   </div>
                 </div>
@@ -551,11 +548,11 @@ export function SettingsPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-gradient-to-br from-green-600 to-teal-600 rounded-full flex items-center justify-center text-white">
-                        JS
+                        ...
                       </div>
                       <div>
-                        <p className="text-sm">Jane Smith</p>
-                        <p className="text-xs text-gray-500">jane.smith@bidmaster.com</p>
+                        <p className="text-sm">Loading...</p>
+                        <p className="text-xs text-gray-500">Loading admin list...</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
