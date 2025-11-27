@@ -16,7 +16,8 @@ const MODULE_TO_PAGE = {
   'Analytics': 'analytics',
   'Settings': 'settings',
   'Referrals': 'referrals',
-  'ReferralSettings': 'referral-settings'
+  'ReferralSettings': 'referral-settings',
+  'Categories': 'categories'
 };
 
 // Role-based access map
@@ -43,7 +44,8 @@ export const ROLE_ACCESS = {
     'Analytics',
     'Settings',
     'Referrals',
-    'ReferralSettings'
+    'ReferralSettings',
+    'Categories'
   ],
   moderator: [
     'Dashboard',
@@ -51,7 +53,8 @@ export const ROLE_ACCESS = {
     'Products',
     'Auctions',
     'Notifications',
-    'Referrals'
+    'Referrals',
+    'Categories'
   ],
   viewer: [
     'Dashboard',

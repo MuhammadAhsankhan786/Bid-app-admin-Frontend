@@ -4,18 +4,13 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Label } from '../components/ui/label';
-import { UserRole } from './LoginPage';
 import { toast } from 'sonner@2.0.3';
-import { apiService } from '../../src/services/api';
+import { apiService } from '../services/api';
 
-interface ReferralSettingsPageProps {
-  userRole: UserRole;
-}
-
-export function ReferralSettingsPage({ userRole }: ReferralSettingsPageProps) {
+export function ReferralSettingsPage({ userRole }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
   const [rewardAmount, setRewardAmount] = useState('1.00');
 
   const isReadOnly = userRole === 'viewer' || userRole === 'moderator';
@@ -38,7 +33,7 @@ export function ReferralSettingsPage({ userRole }: ReferralSettingsPageProps) {
       } else {
         setError(response.message || 'Failed to load settings');
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error loading referral settings:', err);
       setError(err.response?.data?.message || 'Failed to load referral settings');
       toast.error('Failed to load referral settings');
@@ -73,7 +68,7 @@ export function ReferralSettingsPage({ userRole }: ReferralSettingsPageProps) {
         setError(response.message || 'Failed to update settings');
         toast.error(response.message || 'Failed to update settings');
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error updating referral settings:', err);
       setError(err.response?.data?.message || 'Failed to update referral settings');
       toast.error(err.response?.data?.message || 'Failed to update referral settings');
@@ -211,6 +206,4 @@ export function ReferralSettingsPage({ userRole }: ReferralSettingsPageProps) {
     </div>
   );
 }
-
-
 

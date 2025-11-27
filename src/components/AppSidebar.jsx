@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Package, ShoppingCart, BarChart3, Bell, Settings, LogOut, ChevronLeft, Shield } from 'lucide-react';
+import { LayoutDashboard, Users, Package, ShoppingCart, BarChart3, Bell, Settings, LogOut, ChevronLeft, Shield, Tags } from 'lucide-react';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
@@ -35,6 +35,11 @@ const navItems = [{
   label: 'Notifications & Logs',
   icon: Bell,
   roles: ['super-admin', 'superadmin', 'moderator', 'viewer']
+}, {
+  id: 'categories',
+  label: 'Categories',
+  icon: Tags,
+  roles: ['super-admin', 'superadmin', 'moderator']
 }];
 const bottomItems = [{
   id: 'settings',
@@ -88,6 +93,7 @@ export function AppSidebar({
     'orders': 'Orders',
     'analytics': 'Analytics',
     'notifications': 'Notifications',
+    'categories': 'Categories',
     'settings': 'Settings'
   };
   

@@ -2,16 +2,17 @@ import { useState, useEffect } from 'react';
 import { ThemeProvider } from './components/ThemeProvider';
 import { AppSidebar } from './components/AppSidebar';
 import { TopNavbar } from './components/TopNavbar';
-import { LoginPage } from '../tsx/pages/LoginPage';
-import { DashboardPage } from '../tsx/pages/DashboardPage';
-import { UserManagementPage } from '../tsx/pages/UserManagementPage';
-import { ProductManagementPage } from '../tsx/pages/ProductManagementPage';
-import { OrderManagementPage } from '../tsx/pages/OrderManagementPage';
-import { AnalyticsPage } from '../tsx/pages/AnalyticsPage';
-import { NotificationsPage } from '../tsx/pages/NotificationsPage';
-import { SettingsPage } from '../tsx/pages/SettingsPage';
-import { ReferralTransactionsPage } from '../tsx/pages/ReferralTransactionsPage';
-import { ReferralSettingsPage } from '../tsx/pages/ReferralSettingsPage';
+import { LoginPage } from './pages/LoginPage';
+import { DashboardPage } from './pages/DashboardPage';
+import { UserManagementPage } from './pages/UserManagementPage';
+import { ProductManagementPage } from './pages/ProductManagementPage';
+import { OrderManagementPage } from './pages/OrderManagementPage';
+import { AnalyticsPage } from './pages/AnalyticsPage';
+import { NotificationsPage } from './pages/NotificationsPage';
+import { SettingsPage } from './pages/SettingsPage';
+import { ReferralTransactionsPage } from './pages/ReferralTransactionsPage';
+import { ReferralSettingsPage } from './pages/ReferralSettingsPage';
+import { CategoryManagementPage } from './pages/CategoryManagementPage';
 import { Toaster } from './components/ui/sonner';
 import { getRoleFromToken, getScopeFromToken } from './utils/roleUtils';
 import { hasPageAccess } from './utils/roleAccess';
@@ -258,6 +259,9 @@ export default function App() {
     }
     if (currentPage === 'referral-settings' && hasPageAccess(normalizedRole, 'referral-settings')) {
       return /*#__PURE__*/React.createElement(ReferralSettingsPage, { userRole: userRole });
+    }
+    if (currentPage === 'categories' && hasPageAccess(normalizedRole, 'categories')) {
+      return /*#__PURE__*/React.createElement(CategoryManagementPage);
     }
     
     // Default to dashboard if no access or unknown page
