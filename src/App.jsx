@@ -13,6 +13,9 @@ import { SettingsPage } from './pages/SettingsPage';
 import { ReferralTransactionsPage } from './pages/ReferralTransactionsPage';
 import { ReferralSettingsPage } from './pages/ReferralSettingsPage';
 import { CategoryManagementPage } from './pages/CategoryManagementPage';
+import { WalletLogsPage } from './pages/WalletLogsPage';
+import { SellerEarningsDetailPage } from './pages/SellerEarningsDetailPage';
+import { AuctionWinnerDetailPage } from './pages/AuctionWinnerDetailPage';
 import { Toaster } from './components/ui/sonner';
 import { getRoleFromToken, getScopeFromToken } from './utils/roleUtils';
 import { hasPageAccess } from './utils/roleAccess';
@@ -70,7 +73,10 @@ export default function App() {
       'notifications', 
       'settings',
       'referrals',
-      'referral-settings'
+      'referral-settings',
+      'wallet-logs',
+      'seller-earnings',
+      'auction-winner'
     ];
     // Map role-specific dashboards to main dashboard
     if (hash === 'moderator-dashboard' || hash === 'viewer-dashboard') {
@@ -262,6 +268,29 @@ export default function App() {
     }
     if (currentPage === 'categories' && hasPageAccess(normalizedRole, 'categories')) {
       return /*#__PURE__*/React.createElement(CategoryManagementPage);
+    }
+    if (currentPage === 'wallet-logs' && hasPageAccess(normalizedRole, 'wallet-logs')) {
+      return /*#__PURE__*/React.createElement(WalletLogsPage, { userRole: userRole });
+    }
+    if (currentPage === 'seller-earnings') {
+      const sellerId = new URLSearchParams(window.location.search).get('sellerId');
+      return /*#__PURE__*/React.createElement(SellerEarningsDetailPage, {
+        userRole: userRole,
+        sellerId: sellerId,
+        onBack: () => {
+          window.location.hash = 'users';
+        }
+      });
+    }
+    if (currentPage === 'auction-winner') {
+      const productId = new URLSearchParams(window.location.search).get('productId');
+      return /*#__PURE__*/React.createElement(AuctionWinnerDetailPage, {
+        userRole: userRole,
+        productId: productId,
+        onBack: () => {
+          window.location.hash = 'products';
+        }
+      });
     }
     
     // Default to dashboard if no access or unknown page

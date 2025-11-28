@@ -250,6 +250,24 @@ export const apiService = {
     const response = await api.put('/admin/referral/settings', data);
     return response.data;
   },
+
+  // Wallet Logs
+  async getWalletLogs(params = {}) {
+    const response = await api.get('/admin/wallet/logs', { params });
+    return response.data;
+  },
+
+  // Seller Earnings (Admin View)
+  async getSellerEarnings(sellerId) {
+    const response = await api.get(`/admin/seller/${sellerId}/earnings`);
+    return response.data;
+  },
+
+  // Auction Winner Details (Admin View)
+  async getAuctionWinnerDetails(productId) {
+    const response = await api.get(`/admin/auction/${productId}/winner`);
+    return response.data;
+  },
 };
 
 export default api;

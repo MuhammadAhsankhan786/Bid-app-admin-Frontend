@@ -2,7 +2,7 @@
 // 100% READY TO USE
 
 import { useState, useEffect, Fragment } from 'react';
-import { Search, Clock, CheckCircle, XCircle, Flag, Eye, Timer, Lock, Edit, Trash2 } from 'lucide-react';
+import { Search, Clock, CheckCircle, XCircle, Flag, Eye, Timer, Lock, Edit, Trash2, Trophy } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
@@ -31,12 +31,15 @@ export function ProductManagementPage({ userRole }) {
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [pendingProducts, setPendingProducts] = useState([]);
   const [liveAuctions, setLiveAuctions] = useState([]);
+  const [completedAuctions, setCompletedAuctions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [pendingPage, setPendingPage] = useState(1);
   const [livePage, setLivePage] = useState(1);
+  const [completedPage, setCompletedPage] = useState(1);
   const [pendingTotalPages, setPendingTotalPages] = useState(1);
   const [liveTotalPages, setLiveTotalPages] = useState(1);
+  const [completedTotalPages, setCompletedTotalPages] = useState(1);
   const isReadOnly = userRole === 'viewer';
 
   useEffect(() => {
@@ -50,26 +53,31 @@ export function ProductManagementPage({ userRole }) {
         canViewPendingProducts
           ? apiService.getPendingProducts().catch(() => [])
           : Promise.resolve([]),
-        apiService.getLiveAuctions().catch(() => [])
+        apiService.getLiveAuctions().catch(() => []),
+        apiService.getProducts({ status: 'sold', limit: 100 }).catch(() => [])
       ];
 
-      const [pendingResponse, liveResponse] = await Promise.all(promises);
+      const [pendingResponse, liveResponse, completedResponse] = await Promise.all(promises);
 
       const pending = Array.isArray(pendingResponse) ? pendingResponse : pendingResponse?.products || [];
       const live = Array.isArray(liveResponse) ? liveResponse : liveResponse?.auctions || [];
+      const completed = Array.isArray(completedResponse) ? completedResponse : completedResponse?.products || [];
 
       setPendingProducts(pending);
       setLiveAuctions(live);
+      setCompletedAuctions(completed);
       setPendingTotalPages(Math.ceil(pending.length / 10));
       setLiveTotalPages(Math.ceil(live.length / 8));
+      setCompletedTotalPages(Math.ceil(completed.length / 8));
 
-      if (pending.length === 0 && live.length === 0) {
+      if (pending.length === 0 && live.length === 0 && completed.length === 0) {
         toast.info('No products found.');
       }
     } catch (error) {
       toast.error('Failed to load products');
       setPendingProducts([]);
       setLiveAuctions([]);
+      setCompletedAuctions([]);
     } finally {
       setLoading(false);
     }
@@ -298,6 +306,11 @@ export function ProductManagementPage({ userRole }) {
             <Timer className="h-4 w-4" />
             Live Auctions
             <Badge variant="secondary">{liveAuctions.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="completed" className="gap-2">
+            <Trophy className="h-4 w-4" />
+            Completed
+            <Badge variant="secondary">{completedAuctions.length}</Badge>
           </TabsTrigger>
         </TabsList>
 
@@ -575,6 +588,107 @@ export function ProductManagementPage({ userRole }) {
           ) : (
             <div className="text-center py-8 text-gray-500">
               No live auctions found
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="completed" className="space-y-4">
+          {loading ? (
+            <div className="text-center py-8">
+              <InlineLoader message="Loading completed auctions..." />
+            </div>
+          ) : completedAuctions.length > 0 ? (
+            completedAuctions.slice((completedPage - 1) * 8, completedPage * 8).map(auction => (
+              <Card key={auction.id} className="hover:shadow-lg transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="text-gray-900 dark:text-white mb-1">
+                        {auction.title || auction.name || 'Untitled Auction'}
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        Final Bid:{' '}
+                        <span className="text-green-600">
+                          ${parseFloat(auction.current_bid || auction.highest_bid || auction.starting_bid || 0).toFixed(2)}
+                        </span>
+                      </p>
+                    </div>
+                    <Badge variant="default" className="bg-green-600">
+                      Completed
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                      <div>
+                        <p className="text-xs text-gray-500">Winner</p>
+                        <p className="text-sm">{auction.highest_bidder_name || 'No winner'}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-gray-500">Seller</p>
+                        <p className="text-sm">{auction.seller_name || 'Unknown'}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={async () => {
+                          try {
+                            const productData = await apiService.getProductById(auction.id);
+                            setSelectedProduct(productData);
+                            setIsProductModalOpen(true);
+                          } catch (error) {
+                            setSelectedProduct(auction);
+                            setIsProductModalOpen(true);
+                          }
+                        }}
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        View Details
+                      </Button>
+                      <Button 
+                        variant="default"
+                        className="bg-blue-600 hover:bg-blue-700"
+                        onClick={() => {
+                          window.location.hash = `auction-winner?productId=${auction.id}`;
+                        }}
+                      >
+                        <Trophy className="h-4 w-4 mr-2" />
+                        View Winner
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              No completed auctions found
+            </div>
+          )}
+          {completedTotalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={completedPage === 1}
+                onClick={() => setCompletedPage(completedPage - 1)}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                Page {completedPage} of {completedTotalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={completedPage === completedTotalPages}
+                onClick={() => setCompletedPage(completedPage + 1)}
+              >
+                Next
+              </Button>
             </div>
           )}
         </TabsContent>

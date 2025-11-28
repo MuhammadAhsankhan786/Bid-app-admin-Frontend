@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Download, MoreVertical, Eye, UserX, UserCheck, Edit, Shield, Lock } from 'lucide-react';
+import { Search, Filter, Download, MoreVertical, Eye, UserX, UserCheck, Edit, Shield, Lock, DollarSign } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
@@ -376,6 +376,11 @@ export function UserManagementPage({ userRole }) {
                                   DropdownMenuItem,
                                   { onClick: () => { setSelectedUser(user); setIsEditModalOpen(true); } },
                                   React.createElement(Eye, { className: "mr-2 h-4 w-4" }), "View Profile"
+                                ),
+                                (user.role && user.role.toLowerCase() === 'seller') && React.createElement(
+                                  DropdownMenuItem,
+                                  { onClick: () => { window.location.hash = `seller-earnings?sellerId=${user.id}`; } },
+                                  React.createElement(DollarSign, { className: "mr-2 h-4 w-4" }), "View Earnings"
                                 ),
                                 React.createElement(
                                   DropdownMenuItem,

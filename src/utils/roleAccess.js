@@ -17,7 +17,8 @@ const MODULE_TO_PAGE = {
   'Settings': 'settings',
   'Referrals': 'referrals',
   'ReferralSettings': 'referral-settings',
-  'Categories': 'categories'
+  'Categories': 'categories',
+  'WalletLogs': 'wallet-logs'
 };
 
 // Role-based access map
@@ -31,7 +32,8 @@ export const ROLE_ACCESS = {
     'Documents',
     'Notifications',
     'Analytics',
-    'Settings'
+    'Settings',
+    'WalletLogs'
   ],
   'super-admin': [ // Frontend format
     'Dashboard',
@@ -45,7 +47,8 @@ export const ROLE_ACCESS = {
     'Settings',
     'Referrals',
     'ReferralSettings',
-    'Categories'
+    'Categories',
+    'WalletLogs'
   ],
   moderator: [
     'Dashboard',
@@ -54,13 +57,15 @@ export const ROLE_ACCESS = {
     'Auctions',
     'Notifications',
     'Referrals',
-    'Categories'
+    'Categories',
+    'WalletLogs'
   ],
   viewer: [
     'Dashboard',
     'Products',
     'Auctions',
-    'Referrals'
+    'Referrals',
+    'WalletLogs'
   ]
 };
 
