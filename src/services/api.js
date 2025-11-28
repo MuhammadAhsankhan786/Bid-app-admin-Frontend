@@ -130,9 +130,22 @@ export const apiService = {
     return response.data;
   },
 
-  async getProductById(id) {
-    const response = await api.get(`/admin/products/${id}`);
+  async getRejectedProducts() {
+    const response = await api.get('/admin/products/rejected');
     return response.data;
+  },
+
+  async getCompletedProducts(params = {}) {
+    const response = await api.get('/admin/products/completed', { params });
+    return response.data;
+  },
+
+  async getProductById(id) {
+    console.log('[API] getProductById called with id:', id);
+    const response = await api.get(`/admin/products/${id}`);
+    console.log('[API] getProductById response:', response.data);
+    // Backend returns { success: true, data: {...} }
+    return response.data?.data || response.data;
   },
 
   async getProductDocuments(id) {

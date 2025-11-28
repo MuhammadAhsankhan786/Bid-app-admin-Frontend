@@ -267,3 +267,4 @@ export function SellerEarningsDetailPage({ userRole, sellerId, onBack }) {
   );
 }
 
+
