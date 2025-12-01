@@ -56,6 +56,32 @@ api.interceptors.response.use(
 );
 
 export const apiService = {
+  // Generic HTTP methods
+  async get(url, config = {}) {
+    const response = await api.get(url, config);
+    return response;
+  },
+
+  async post(url, data = {}, config = {}) {
+    const response = await api.post(url, data, config);
+    return response;
+  },
+
+  async put(url, data = {}, config = {}) {
+    const response = await api.put(url, data, config);
+    return response;
+  },
+
+  async patch(url, data = {}, config = {}) {
+    const response = await api.patch(url, data, config);
+    return response;
+  },
+
+  async delete(url, config = {}) {
+    const response = await api.delete(url, config);
+    return response;
+  },
+
   // Dashboard
   async getDashboard() {
     const response = await api.get('/admin/dashboard');

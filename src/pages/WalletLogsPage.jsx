@@ -95,6 +95,72 @@ export function WalletLogsPage({ userRole }) {
     }
   };
 
+  const exportToCSV = async () => {
+    try {
+      // Fetch all transactions (without pagination) for export
+      const params = {
+        page: 1,
+        limit: 10000, // Large limit to get all records
+        ...(typeFilter !== 'all' && { type: typeFilter }),
+        ...(statusFilter !== 'all' && { status: statusFilter }),
+        ...(searchTerm && { userId: searchTerm })
+      };
+
+      const response = await apiService.getWalletLogs(params);
+      
+      if (!response.success || !response.data || response.data.length === 0) {
+        toast.error('No data to export');
+        return;
+      }
+
+      const data = response.data;
+
+      // Create CSV headers
+      const headers = ['ID', 'User ID', 'User Name', 'User Email', 'Type', 'Amount', 'Status', 'Description', 'Date'];
+      
+      // Create CSV rows
+      const csvRows = [
+        headers.join(','),
+        ...data.map(tx => {
+          const row = [
+            tx.id || '',
+            tx.user_id || '',
+            (tx.user_name || 'N/A').replace(/,/g, ';'), // Replace commas in names
+            (tx.user_email || 'N/A').replace(/,/g, ';'),
+            tx.transaction_type || '',
+            tx.amount || '0',
+            tx.status || '',
+            (tx.description || tx.transaction_description || 'N/A').replace(/,/g, ';').replace(/"/g, '""'), // Escape quotes
+            formatDate(tx.transaction_date)
+          ];
+          // Wrap fields in quotes to handle commas and special characters
+          return row.map(field => `"${field}"`).join(',');
+        })
+      ];
+
+      // Create CSV content
+      const csvContent = csvRows.join('\n');
+
+      // Create blob and download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', `wallet_logs_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success('CSV exported successfully');
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      toast.error('Failed to export CSV');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -105,7 +171,7 @@ export function WalletLogsPage({ userRole }) {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={exportToCSV} disabled={loading || transactions.length === 0}>
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>

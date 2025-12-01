@@ -283,11 +283,13 @@ export default function App() {
       });
     }
     if (currentPage === 'auction-winner') {
-      const productId = new URLSearchParams(window.location.search).get('productId');
+      // Get productId from sessionStorage (set by ProductManagementPage)
+      const productId = sessionStorage.getItem('auctionWinnerProductId');
       return /*#__PURE__*/React.createElement(AuctionWinnerDetailPage, {
         userRole: userRole,
         productId: productId,
         onBack: () => {
+          sessionStorage.removeItem('auctionWinnerProductId');
           window.location.hash = 'products';
         }
       });

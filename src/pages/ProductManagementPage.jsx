@@ -1100,8 +1100,12 @@ export function ProductManagementPage({ userRole }) {
                       <Button 
                         variant="default"
                         className="bg-blue-600 hover:bg-blue-700 flex-1 min-w-[100px]"
-                        onClick={() => {
-                          window.location.hash = `auction-winner?productId=${auction.id}`;
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          // Store productId in sessionStorage and navigate
+                          sessionStorage.setItem('auctionWinnerProductId', auction.id);
+                          window.location.hash = 'auction-winner';
                         }}
                       >
                         <Trophy className="h-4 w-4 mr-1 sm:mr-2" />

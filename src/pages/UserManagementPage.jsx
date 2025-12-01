@@ -26,6 +26,7 @@ export function UserManagementPage({ userRole }) {
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
   const isReadOnly = userRole === 'viewer';
+  const canDelete = userRole === 'superadmin' || userRole === 'super-admin';
 
   useEffect(() => {
     setPage(1); // Reset to page 1 when filters change
@@ -82,7 +83,7 @@ export function UserManagementPage({ userRole }) {
   };
 
   const handleDelete = async (userId) => {
-    if (isReadOnly) return toast.error('You do not have permission');
+    if (isReadOnly || !canDelete) return toast.error('You do not have permission to delete users');
     try { await apiService.deleteUser(userId); toast.success('User deleted'); loadUsers(); } catch { toast.error('Failed'); }
   };
 
@@ -405,7 +406,7 @@ export function UserManagementPage({ userRole }) {
                                       React.createElement(UserCheck, { className: "mr-2 h-4 w-4" }), "Activate User"
                                     ),
 
-                                React.createElement(
+                                canDelete && React.createElement(
                                   DropdownMenuItem,
                                   { className: "text-red-600", onClick: () => handleDelete(user.id) },
                                   React.createElement(UserX, { className: "mr-2 h-4 w-4" }), "Delete User"
