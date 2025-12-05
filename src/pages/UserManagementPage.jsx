@@ -52,7 +52,7 @@ export function UserManagementPage({ userRole }) {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Buyer',
+        role: user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Company Products',
         status: user.status ? user.status.charAt(0).toUpperCase() + user.status.slice(1) : 'Active',
         joined: user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A',
         bids: user.bids_count || 0
@@ -84,17 +84,56 @@ export function UserManagementPage({ userRole }) {
 
   const handleDelete = async (userId) => {
     if (isReadOnly || !canDelete) return toast.error('You do not have permission to delete users');
-    try { await apiService.deleteUser(userId); toast.success('User deleted'); loadUsers(); } catch { toast.error('Failed'); }
+    try { 
+      const response = await apiService.deleteUser(userId);
+      if (response?.success || response?.message) {
+        toast.success(response.message || 'User deleted successfully');
+        loadUsers();
+      } else {
+        toast.error('Delete completed but unexpected response format');
+        loadUsers(); // Still reload in case it worked
+      }
+    } catch (error) { 
+      console.error('Delete user error:', error);
+      const errorMessage = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to delete user';
+      toast.error(errorMessage);
+    }
   };
 
   const handleApprove = async (userId) => {
     if (isReadOnly) return toast.error('You do not have permission');
-    try { await apiService.approveUser(userId); toast.success('User approved'); loadUsers(); } catch { toast.error('Failed'); }
+    try { 
+      const response = await apiService.approveUser(userId);
+      if (response?.message || response?.user) {
+        toast.success(response.message || 'User approved successfully');
+        loadUsers();
+      } else {
+        toast.error('Approve completed but unexpected response format');
+        loadUsers(); // Still reload in case it worked
+      }
+    } catch (error) { 
+      console.error('Approve user error:', error);
+      const errorMessage = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to approve user';
+      toast.error(errorMessage);
+    }
   };
 
   const handleBlock = async (userId) => {
     if (isReadOnly) return toast.error('You do not have permission');
-    try { await apiService.blockUser(userId); toast.success('User blocked'); loadUsers(); } catch { toast.error('Failed'); }
+    try { 
+      const response = await apiService.blockUser(userId);
+      if (response?.message || response?.user) {
+        toast.success(response.message || 'User blocked successfully');
+        loadUsers();
+      } else {
+        toast.error('Block completed but unexpected response format');
+        loadUsers(); // Still reload in case it worked
+      }
+    } catch (error) { 
+      console.error('Block user error:', error);
+      const errorMessage = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to block user';
+      toast.error(errorMessage);
+    }
   };
 
   const handleExportPDF = async () => {
@@ -235,8 +274,8 @@ export function UserManagementPage({ userRole }) {
               SelectContent,
               null,
               React.createElement(SelectItem, { value: "all" }, "All Roles"),
-              React.createElement(SelectItem, { value: "buyer" }, "Buyer"),
-              React.createElement(SelectItem, { value: "seller" }, "Seller")
+              React.createElement(SelectItem, { value: "company_products" }, "Company Products"),
+              React.createElement(SelectItem, { value: "seller_products" }, "Seller Products")
             )
           ),
 
@@ -378,7 +417,7 @@ export function UserManagementPage({ userRole }) {
                                   { onClick: () => { setSelectedUser(user); setIsEditModalOpen(true); } },
                                   React.createElement(Eye, { className: "mr-2 h-4 w-4" }), "View Profile"
                                 ),
-                                (user.role && user.role.toLowerCase() === 'seller') && React.createElement(
+                                (user.role && user.role.toLowerCase() === 'seller_products') && React.createElement(
                                   DropdownMenuItem,
                                   { onClick: () => { window.location.hash = `seller-earnings?sellerId=${user.id}`; } },
                                   React.createElement(DollarSign, { className: "mr-2 h-4 w-4" }), "View Earnings"
@@ -521,8 +560,8 @@ export function UserManagementPage({ userRole }) {
                 React.createElement(
                   SelectContent,
                   null,
-                  React.createElement(SelectItem, { value: "buyer" }, "Buyer"),
-                  React.createElement(SelectItem, { value: "seller" }, "Seller")
+                  React.createElement(SelectItem, { value: "company_products" }, "Company Products"),
+                  React.createElement(SelectItem, { value: "seller_products" }, "Seller Products")
                 )
               )
             ),

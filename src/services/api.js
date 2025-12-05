@@ -1,9 +1,40 @@
 import axios from 'axios';
 import { getScopeFromToken } from '../utils/roleUtils';
 
-// Use local API for development, production API for deployment
-// Set VITE_BASE_URL=http://localhost:5000/api in .env for local development
-const BASE_URL = import.meta.env.VITE_BASE_URL || import.meta.env.REACT_APP_BASE_URL || 'http://localhost:5000/api';
+/**
+ * Get API Base URL based on environment
+ * - Development: http://localhost:5000/api
+ * - Production: https://api.mazaadati.com/api
+ * - Can be overridden with VITE_BASE_URL environment variable
+ */
+function getBaseUrl() {
+  // Check if explicitly set via environment variable (highest priority)
+  const envUrl = import.meta.env.VITE_BASE_URL || import.meta.env.REACT_APP_BASE_URL;
+  if (envUrl) {
+    console.log('🌐 [Admin Panel] Using API URL from environment:', envUrl);
+    return envUrl;
+  }
+
+  // Check if in development mode
+  const isDevelopment = import.meta.env.MODE === 'development' || 
+                        import.meta.env.DEV || 
+                        window.location.hostname === 'localhost' ||
+                        window.location.hostname === '127.0.0.1';
+
+  if (isDevelopment) {
+    const localUrl = 'http://localhost:5000/api';
+    console.log('🌐 [Admin Panel] Development mode - Using LOCAL API:', localUrl);
+    console.log('   Make sure backend is running on http://localhost:5000');
+    return localUrl;
+  }
+
+  // Production mode
+  const productionUrl = 'https://api.mazaadati.com/api';
+  console.log('🌐 [Admin Panel] Production mode - Using PRODUCTION API:', productionUrl);
+  return productionUrl;
+}
+
+const BASE_URL = getBaseUrl();
 
 // Create axios instance with default config
 const api = axios.create({
