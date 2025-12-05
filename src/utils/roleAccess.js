@@ -18,6 +18,7 @@ const MODULE_TO_PAGE = {
   'Referrals': 'referrals',
   'ReferralSettings': 'referral-settings',
   'Categories': 'categories',
+  'Banners': 'banners',
   'WalletLogs': 'wallet-logs'
 };
 
@@ -33,6 +34,10 @@ export const ROLE_ACCESS = {
     'Notifications',
     'Analytics',
     'Settings',
+    'Referrals',
+    'ReferralSettings',
+    'Categories',
+    'Banners',
     'WalletLogs'
   ],
   'super-admin': [ // Frontend format
@@ -48,6 +53,7 @@ export const ROLE_ACCESS = {
     'Referrals',
     'ReferralSettings',
     'Categories',
+    'Banners',
     'WalletLogs'
   ],
   moderator: [
@@ -58,6 +64,7 @@ export const ROLE_ACCESS = {
     'Notifications',
     'Referrals',
     'Categories',
+    'Banners',
     'WalletLogs'
   ],
   viewer: [

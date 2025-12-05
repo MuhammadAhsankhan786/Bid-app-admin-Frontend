@@ -333,14 +333,14 @@ export function ProductManagementPage({ userRole }) {
     <div className="space-y-6 w-full">
 
       <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Delete Product?</DialogTitle>
             <DialogDescription>
               This action cannot be undone. The product "{selectedProductName}" will be permanently deleted.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 flex flex-row justify-end">
+          <DialogFooter className="gap-2 flex-col sm:flex-row sm:justify-end">
             <Button
               variant="outline"
               onClick={() => {
@@ -349,7 +349,7 @@ export function ProductManagementPage({ userRole }) {
                 setSelectedProductName(null);
               }}
               disabled={isDeleting}
-              className="min-w-[80px]"
+              className="w-full sm:w-auto min-w-[80px]"
             >
               Cancel
             </Button>
@@ -357,7 +357,7 @@ export function ProductManagementPage({ userRole }) {
               variant="destructive"
               onClick={handleDeleteConfirm}
               disabled={isDeleting}
-              className="bg-red-600 hover:bg-red-700 text-white min-w-[80px]"
+              className="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto min-w-[80px]"
             >
               {isDeleting ? 'Deleting...' : 'Delete'}
             </Button>
@@ -373,10 +373,10 @@ export function ProductManagementPage({ userRole }) {
         }
       }}>
         <DialogContent
-          className="max-w-[400px] w-[85vw] sm:w-[90vw] md:w-[450px]
-                     max-h-[60vh] sm:max-h-[55vh] md:max-h-[65vh]
-                     p-2.5 sm:p-3 md:p-4
-                     flex flex-col overflow-hidden
+          className="max-w-[400px] w-[calc(100%-1rem)] sm:w-[90vw] md:w-[450px] lg:w-[600px]
+                     max-h-[90vh] sm:max-h-[85vh] md:max-h-[80vh]
+                     p-3 sm:p-4 md:p-6
+                     flex flex-col overflow-y-auto
                      mx-auto"
         >
           <DialogHeader className="flex-shrink-0 pb-1 sm:pb-1.5">

@@ -375,7 +375,7 @@ export function ReferralTransactionsPage({ userRole }) {
 
       {/* Revoke Confirmation Modal */}
       <Dialog open={isRevokeModalOpen} onOpenChange={setIsRevokeModalOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Revoke Referral Transaction</DialogTitle>
             <DialogDescription>
@@ -383,7 +383,7 @@ export function ReferralTransactionsPage({ userRole }) {
             </DialogDescription>
           </DialogHeader>
           {selectedTransaction && (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg space-y-2">
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600 dark:text-gray-400">Transaction ID:</span>
@@ -400,14 +400,15 @@ export function ReferralTransactionsPage({ userRole }) {
               </div>
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsRevokeModalOpen(false)} disabled={isRevoking}>
+          <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setIsRevokeModalOpen(false)} disabled={isRevoking} className="w-full sm:w-auto">
               Cancel
             </Button>
             <Button
               variant="destructive"
               onClick={handleRevoke}
               disabled={isRevoking}
+              className="w-full sm:w-auto"
             >
               {isRevoking ? (
                 <>

@@ -5,32 +5,60 @@ import { getScopeFromToken } from '../utils/roleUtils';
  * Get API Base URL based on environment
  * - Development: http://localhost:5000/api
  * - Production: https://api.mazaadati.com/api
- * - Can be overridden with VITE_BASE_URL environment variable
+ * - Can be overridden with VITE_BASE_URL environment variable or localStorage
  */
 function getBaseUrl() {
-  // Check if explicitly set via environment variable (highest priority)
-  const envUrl = import.meta.env.VITE_BASE_URL || import.meta.env.REACT_APP_BASE_URL;
-  if (envUrl) {
-    console.log('🌐 [Admin Panel] Using API URL from environment:', envUrl);
-    return envUrl;
+  // Priority 1: Check localStorage for manual override (for testing)
+  const storedUrl = localStorage.getItem('API_BASE_URL');
+  if (storedUrl && storedUrl.trim() !== '') {
+    console.log('🌐 [Admin Panel] Using API URL from localStorage:', storedUrl);
+    return storedUrl;
   }
 
-  // Check if in development mode
-  const isDevelopment = import.meta.env.MODE === 'development' || 
-                        import.meta.env.DEV || 
-                        window.location.hostname === 'localhost' ||
-                        window.location.hostname === '127.0.0.1';
+  // Priority 2: Check if running on localhost (ALWAYS use local URL on localhost)
+  const hostname = window.location.hostname;
+  const port = window.location.port;
+  const isLocalhost = hostname === 'localhost' || 
+                      hostname === '127.0.0.1' || 
+                      hostname === '' ||
+                      hostname.startsWith('192.168.') ||
+                      hostname.startsWith('10.') ||
+                      hostname.startsWith('172.');
 
-  if (isDevelopment) {
+  // If on localhost, ALWAYS use local URL (ignore environment variables)
+  if (isLocalhost) {
     const localUrl = 'http://localhost:5000/api';
-    console.log('🌐 [Admin Panel] Development mode - Using LOCAL API:', localUrl);
+    console.log('🌐 [Admin Panel] Localhost detected - Using LOCAL API:', localUrl);
+    console.log('   Hostname:', hostname, 'Port:', port);
     console.log('   Make sure backend is running on http://localhost:5000');
     return localUrl;
   }
 
-  // Production mode
+  // Priority 3: Check Vite development mode
+  const isViteDev = import.meta.env.MODE === 'development' || 
+                    import.meta.env.DEV ||
+                    import.meta.env.PROD === false;
+
+  // Use local URL if in development mode
+  if (isViteDev || port === '3000' || port === '5173') {
+    const localUrl = 'http://localhost:5000/api';
+    console.log('🌐 [Admin Panel] Development mode - Using LOCAL API:', localUrl);
+    console.log('   Hostname:', hostname, 'Port:', port);
+    console.log('   Make sure backend is running on http://localhost:5000');
+    return localUrl;
+  }
+
+  // Priority 4: Check environment variable (only for production)
+  const envUrl = import.meta.env.VITE_BASE_URL || import.meta.env.REACT_APP_BASE_URL;
+  if (envUrl && envUrl.trim() !== '') {
+    console.log('🌐 [Admin Panel] Using API URL from environment:', envUrl);
+    return envUrl;
+  }
+
+  // Production mode (when deployed to production domain)
   const productionUrl = 'https://api.mazaadati.com/api';
   console.log('🌐 [Admin Panel] Production mode - Using PRODUCTION API:', productionUrl);
+  console.log('   Hostname:', hostname, 'Port:', port);
   return productionUrl;
 }
 
@@ -336,6 +364,43 @@ export const apiService = {
   // Auction Winner Details (Admin View)
   async getAuctionWinnerDetails(productId) {
     const response = await api.get(`/admin/auction/${productId}/winner`);
+    return response.data;
+  },
+
+  // Banners
+  async getBanners() {
+    try {
+      const response = await api.get('/banners');
+      return response.data;
+    } catch (error) {
+      // If 404, return empty array (no banners created yet)
+      if (error.response?.status === 404) {
+        return { success: true, data: [] };
+      }
+      throw error;
+    }
+  },
+
+  async createBanner(formData) {
+    const response = await api.post('/banners', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  async updateBanner(id, formData) {
+    const response = await api.put(`/banners/${id}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  async deleteBanner(id) {
+    const response = await api.delete(`/banners/${id}`);
     return response.data;
   },
 };

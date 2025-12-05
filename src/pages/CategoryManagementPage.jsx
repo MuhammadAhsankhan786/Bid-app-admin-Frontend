@@ -204,7 +204,7 @@ export function CategoryManagementPage() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingCategory ? 'Edit Category' : 'Create Category'}
@@ -213,7 +213,7 @@ export function CategoryManagementPage() {
               {editingCategory ? 'Update category information' : 'Add a new product category'}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <div>
               <Label htmlFor="name">Name *</Label>
               <Input
@@ -257,12 +257,12 @@ export function CategoryManagementPage() {
               </div>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+          <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto">
               <X className="h-4 w-4 mr-2" />
               Cancel
             </Button>
-            <Button onClick={handleSave}>
+            <Button onClick={handleSave} className="w-full sm:w-auto">
               <Save className="h-4 w-4 mr-2" />
               {editingCategory ? 'Update' : 'Create'}
             </Button>

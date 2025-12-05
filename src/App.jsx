@@ -13,6 +13,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { ReferralTransactionsPage } from './pages/ReferralTransactionsPage';
 import { ReferralSettingsPage } from './pages/ReferralSettingsPage';
 import { CategoryManagementPage } from './pages/CategoryManagementPage';
+import { BannerManagementPage } from './pages/BannerManagementPage';
 import { WalletLogsPage } from './pages/WalletLogsPage';
 import { SellerEarningsDetailPage } from './pages/SellerEarningsDetailPage';
 import { AuctionWinnerDetailPage } from './pages/AuctionWinnerDetailPage';
@@ -76,7 +77,9 @@ export default function App() {
       'referral-settings',
       'wallet-logs',
       'seller-earnings',
-      'auction-winner'
+      'auction-winner',
+      'banners',
+      'categories'
     ];
     // Map role-specific dashboards to main dashboard
     if (hash === 'moderator-dashboard' || hash === 'viewer-dashboard') {
@@ -268,6 +271,9 @@ export default function App() {
     }
     if (currentPage === 'categories' && hasPageAccess(normalizedRole, 'categories')) {
       return /*#__PURE__*/React.createElement(CategoryManagementPage);
+    }
+    if (currentPage === 'banners' && hasPageAccess(normalizedRole, 'banners')) {
+      return /*#__PURE__*/React.createElement(BannerManagementPage);
     }
     if (currentPage === 'wallet-logs' && hasPageAccess(normalizedRole, 'wallet-logs')) {
       return /*#__PURE__*/React.createElement(WalletLogsPage, { userRole: userRole });
