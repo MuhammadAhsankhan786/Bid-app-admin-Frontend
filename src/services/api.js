@@ -102,14 +102,45 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle auth errors
+// Track if we've already tried to switch to production (prevent infinite loop)
+let hasSwitchedToProduction = false;
+
+// Handle auth errors and connection failures with auto-fallback
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    // Handle authentication errors
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       window.location.href = '/';
+      return Promise.reject(error);
     }
+    
+    // Handle connection refused errors (backend not running) - AUTO-SWITCH to production
+    if ((error.code === 'ERR_NETWORK' || error.code === 'ECONNREFUSED' || 
+         (error.message && error.message.includes('ERR_CONNECTION_REFUSED'))) &&
+        !hasSwitchedToProduction) {
+      const currentUrl = BASE_URL;
+      
+      // If trying to connect to localhost and it fails, AUTO-SWITCH to production
+      if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) {
+        console.warn('⚠️ [Admin Panel] Local backend not accessible:', currentUrl);
+        console.warn('   🔄 Auto-switching to PRODUCTION API...');
+        
+        // Auto-switch to production
+        localStorage.setItem('API_BASE_URL', 'https://api.mazaadati.com/api');
+        hasSwitchedToProduction = true;
+        
+        console.log('✅ [Admin Panel] Switched to PRODUCTION API: https://api.mazaadati.com/api');
+        console.log('   💡 To switch back to local, run:');
+        console.log('      localStorage.setItem("API_BASE_URL", "http://localhost:5000/api"); location.reload();');
+        
+        // Reload page to use new URL
+        window.location.reload();
+        return Promise.reject(error);
+      }
+    }
+    
     return Promise.reject(error);
   }
 );

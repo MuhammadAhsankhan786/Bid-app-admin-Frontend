@@ -206,13 +206,26 @@ export function SettingsPage({ userRole }) {
             }
           }
           
-          let baseURL = "http://localhost:5000/api";
-          if (typeof import.meta !== "undefined" && import.meta.env) {
-            baseURL =
-              import.meta.env.VITE_BASE_URL ||
-              import.meta.env.REACT_APP_BASE_URL ||
-              baseURL;
+          // Get base URL based on environment
+          function getBaseUrl() {
+            const envUrl = import.meta.env?.VITE_BASE_URL || import.meta.env?.REACT_APP_BASE_URL;
+            if (envUrl) {
+              return envUrl;
+            }
+
+            const isDevelopment = import.meta.env?.MODE === 'development' || 
+                                  import.meta.env?.DEV || 
+                                  window.location.hostname === 'localhost' ||
+                                  window.location.hostname === '127.0.0.1';
+
+            if (isDevelopment) {
+              return 'http://localhost:5000/api';
+            }
+
+            return 'https://api.mazaadati.com/api';
           }
+          
+          const baseURL = getBaseUrl();
           const response = await fetch(`${baseURL}/admin/settings/logo`, {
             headers: { Authorization: `Bearer ${token}` },
           });
