@@ -22,6 +22,9 @@ export function UserManagementPage({ userRole }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedUser, setSelectedUser] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isRoleChangeModalOpen, setIsRoleChangeModalOpen] = useState(false);
+  const [selectedRoleForChange, setSelectedRoleForChange] = useState('');
+  const [isChangingRole, setIsChangingRole] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
@@ -48,11 +51,32 @@ export function UserManagementPage({ userRole }) {
       if (statusFilter !== 'all') params.status = statusFilter === 'active' ? 'approved' : statusFilter;
 
       const response = await apiService.getUsers(params);
+      
+      // Helper function to map backend role to display label
+      const mapRoleToLabel = (role) => {
+        if (!role) return 'N/A';
+        const normalizedRole = role.toLowerCase().trim();
+        const roleMap = {
+          'superadmin': 'Super Admin',
+          'super_admin': 'Super Admin',
+          'admin': 'Super Admin',
+          'moderator': 'Moderator',
+          'viewer': 'Viewer',
+          'employee': 'Employee',
+          'seller_products': 'Seller',
+          'seller': 'Seller',
+          'company_products': 'Employee', // Company products are managed by employees
+          'buyer': 'Employee' // Buyer maps to Employee in admin panel
+        };
+        return roleMap[normalizedRole] || role.charAt(0).toUpperCase() + role.slice(1).replace(/_/g, ' ');
+      };
+      
       const formattedUsers = (response.users || response.data || []).map(user => ({
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Company Products',
+        role: mapRoleToLabel(user.role), // Display label
+        roleValue: user.role, // Original backend role value for operations
         status: user.status ? user.status.charAt(0).toUpperCase() + user.status.slice(1) : 'Active',
         joined: user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A',
         bids: user.bids_count || 0
@@ -133,6 +157,121 @@ export function UserManagementPage({ userRole }) {
       console.error('Block user error:', error);
       const errorMessage = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to block user';
       toast.error(errorMessage);
+    }
+  };
+
+  const handleChangeRoleClick = (user) => {
+    if (isReadOnly) return toast.error('You do not have permission');
+    
+    // Check if user is Seller - Seller role cannot be changed
+    const currentRoleValue = user.roleValue || (user.role?.toLowerCase() === 'seller' ? 'seller_products' : '');
+    if (currentRoleValue === 'seller_products') {
+      toast.error('Seller role cannot be changed');
+      return;
+    }
+    
+    setSelectedUser(user);
+    // Use roleValue (backend enum) directly - this is the source of truth
+    // roleValue comes from backend API response (user.role field)
+    let initialRole = user.roleValue;
+    
+    // Fallback: If roleValue not available, map from display label to backend enum
+    if (!initialRole) {
+      const roleLabel = user.role?.toLowerCase();
+      if (roleLabel === 'super admin') initialRole = 'superadmin';
+      else if (roleLabel === 'moderator') initialRole = 'moderator';
+      else if (roleLabel === 'viewer') initialRole = 'viewer';
+      else if (roleLabel === 'employee') {
+        // Employee can be either 'employee' or 'company_products' in backend
+        // Default to 'employee', user can change if needed
+        initialRole = 'employee';
+      }
+      else if (roleLabel === 'seller') initialRole = 'seller_products';
+      else initialRole = 'employee'; // fallback
+    }
+    
+    // Normalize company_products to employee (they both represent Employee role in admin panel)
+    if (initialRole === 'company_products') {
+      initialRole = 'employee';
+    }
+    
+    // Ensure we have a valid backend enum value
+    const validBackendRoles = ['superadmin', 'moderator', 'viewer', 'employee', 'seller_products'];
+    if (!initialRole || !validBackendRoles.includes(initialRole)) {
+      console.warn('Invalid role value, defaulting to employee:', initialRole);
+      initialRole = 'employee';
+    }
+    
+    setSelectedRoleForChange(initialRole);
+    setIsRoleChangeModalOpen(true);
+  };
+
+  const handleSaveRoleChange = async () => {
+    if (!selectedUser || !selectedRoleForChange) {
+      toast.error('Please select a role');
+      return;
+    }
+
+    if (isReadOnly) return toast.error('You do not have permission');
+
+    // UI Restriction: Block Employee ↔ Seller conversion
+    // Normalize company_products to employee for comparison
+    let currentRoleValue = selectedUser.roleValue || (selectedUser.role?.toLowerCase() === 'seller' ? 'seller_products' : 'employee');
+    if (currentRoleValue === 'company_products') {
+      currentRoleValue = 'employee';
+    }
+    
+    // Block changing TO Seller
+    if (selectedRoleForChange === 'seller_products') {
+      toast.error('Cannot change role to Seller. Seller role is fixed.');
+      return;
+    }
+    
+    // Block changing FROM Seller (already handled in handleChangeRoleClick, but double-check)
+    if (currentRoleValue === 'seller_products') {
+      toast.error('Seller role cannot be changed');
+      return;
+    }
+
+    // Ensure we're sending backend enum value, not UI label
+    let backendRoleValue = selectedRoleForChange; // This should already be backend enum
+    
+    // Normalize company_products to employee (they both represent Employee role)
+    if (backendRoleValue === 'company_products') {
+      backendRoleValue = 'employee';
+    }
+    
+    // Validate backend enum value before sending
+    const validBackendRoles = ['superadmin', 'moderator', 'viewer', 'employee', 'seller_products'];
+    if (!validBackendRoles.includes(backendRoleValue)) {
+      toast.error('Invalid role value. Please try again.');
+      console.error('Invalid role value sent to API:', backendRoleValue);
+      return;
+    }
+
+    try {
+      setIsChangingRole(true);
+      
+      // Send backend enum value to API (not UI label)
+      const response = await apiService.updateUserRole(selectedUser.id, backendRoleValue);
+      
+      if (response?.message || response?.user) {
+        // Success: Show toast, close modal, refresh list
+        toast.success(response.message || 'User role updated successfully');
+        setIsRoleChangeModalOpen(false);
+        setSelectedUser(null);
+        setSelectedRoleForChange('');
+        await loadUsers(); // Refresh user list
+      } else {
+        toast.error('Role change completed but unexpected response format');
+        await loadUsers(); // Still reload in case it worked
+      }
+    } catch (error) {
+      console.error('Change role error:', error);
+      const errorMessage = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to update user role';
+      toast.error(errorMessage);
+    } finally {
+      setIsChangingRole(false);
     }
   };
 
@@ -274,8 +413,12 @@ export function UserManagementPage({ userRole }) {
               SelectContent,
               null,
               React.createElement(SelectItem, { value: "all" }, "All Roles"),
-              React.createElement(SelectItem, { value: "company_products" }, "Company Products"),
-              React.createElement(SelectItem, { value: "seller_products" }, "Seller Products")
+              React.createElement(SelectItem, { value: "superadmin" }, "Super Admin"),
+              React.createElement(SelectItem, { value: "moderator" }, "Moderator"),
+              React.createElement(SelectItem, { value: "viewer" }, "Viewer"),
+              React.createElement(SelectItem, { value: "employee" }, "Employee"),
+              React.createElement(SelectItem, { value: "seller_products" }, "Seller"),
+              React.createElement(SelectItem, { value: "company_products" }, "Employee")
             )
           ),
 
@@ -417,7 +560,7 @@ export function UserManagementPage({ userRole }) {
                                   { onClick: () => { setSelectedUser(user); setIsEditModalOpen(true); } },
                                   React.createElement(Eye, { className: "mr-2 h-4 w-4" }), "View Profile"
                                 ),
-                                (user.role && user.role.toLowerCase() === 'seller_products') && React.createElement(
+                                (user.roleValue && user.roleValue.toLowerCase() === 'seller_products') && React.createElement(
                                   DropdownMenuItem,
                                   { onClick: () => { window.location.hash = `seller-earnings?sellerId=${user.id}`; } },
                                   React.createElement(DollarSign, { className: "mr-2 h-4 w-4" }), "View Earnings"
@@ -427,9 +570,9 @@ export function UserManagementPage({ userRole }) {
                                   { onClick: () => { setSelectedUser(user); setIsEditModalOpen(true); } },
                                   React.createElement(Edit, { className: "mr-2 h-4 w-4" }), "Edit User"
                                 ),
-                                React.createElement(
+                                !isReadOnly && (user.roleValue !== 'seller_products' && user.role?.toLowerCase() !== 'seller') && React.createElement(
                                   DropdownMenuItem,
-                                  null,
+                                  { onClick: () => handleChangeRoleClick(user) },
                                   React.createElement(Shield, { className: "mr-2 h-4 w-4" }), "Change Role"
                                 ),
 
@@ -551,17 +694,21 @@ export function UserManagementPage({ userRole }) {
               "div",
               { className: "space-y-2" },
               React.createElement(Label, null, "Role"),
-              React.createElement(
-                Select,
-                { defaultValue: selectedUser.role.toLowerCase() },
+                React.createElement(
+                  Select,
+                  { defaultValue: selectedUser.roleValue ? selectedUser.roleValue.toLowerCase() : selectedUser.role.toLowerCase() },
                 React.createElement(SelectTrigger, null,
                   React.createElement(SelectValue, null)
                 ),
                 React.createElement(
                   SelectContent,
                   null,
-                  React.createElement(SelectItem, { value: "company_products" }, "Company Products"),
-                  React.createElement(SelectItem, { value: "seller_products" }, "Seller Products")
+                  React.createElement(SelectItem, { value: "superadmin" }, "Super Admin"),
+                  React.createElement(SelectItem, { value: "moderator" }, "Moderator"),
+                  React.createElement(SelectItem, { value: "viewer" }, "Viewer"),
+                  React.createElement(SelectItem, { value: "employee" }, "Employee"),
+                  React.createElement(SelectItem, { value: "seller_products" }, "Seller"),
+                  React.createElement(SelectItem, { value: "company_products" }, "Employee")
                 )
               )
             ),
@@ -614,6 +761,97 @@ export function UserManagementPage({ userRole }) {
               "Cancel"
             ),
             React.createElement(Button, null, "Save Changes")
+          )
+        )
+      )
+    ),
+
+    // ---- Change Role Modal ----
+    React.createElement(
+      Dialog,
+      { open: isRoleChangeModalOpen, onOpenChange: setIsRoleChangeModalOpen },
+      React.createElement(
+        DialogContent,
+        null,
+        React.createElement(DialogHeader, null,
+          React.createElement(DialogTitle, null, "Change User Role"),
+          React.createElement(DialogDescription, null, "Update the role for this user")
+        ),
+
+        selectedUser && React.createElement(
+          "div",
+          { className: "space-y-4" },
+          React.createElement(
+            "div",
+            { className: "flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg" },
+            React.createElement(
+              Avatar,
+              { className: "w-16 h-16" },
+              React.createElement(
+                AvatarFallback,
+                { className: "bg-gradient-to-br from-blue-500 to-purple-500 text-white text-xl" },
+                selectedUser.name.split(' ').map(n => n[0]).join('')
+              )
+            ),
+            React.createElement(
+              "div",
+              null,
+              React.createElement("p", { className: "font-medium" }, selectedUser.name),
+              React.createElement("p", { className: "text-sm text-gray-500" }, selectedUser.email),
+              React.createElement("p", { className: "text-xs text-gray-400 mt-1" }, `Current Role: ${selectedUser.role}`)
+            )
+          ),
+
+          React.createElement(
+            "div",
+            { className: "space-y-2" },
+            React.createElement(Label, null, "New Role"),
+            React.createElement(
+              Select,
+              { 
+                value: selectedRoleForChange, 
+                onValueChange: setSelectedRoleForChange 
+              },
+              React.createElement(SelectTrigger, null,
+                React.createElement(SelectValue, { placeholder: "Select a role" })
+              ),
+              React.createElement(
+                SelectContent,
+                null,
+                React.createElement(SelectItem, { value: "superadmin" }, "Super Admin"),
+                React.createElement(SelectItem, { value: "moderator" }, "Moderator"),
+                React.createElement(SelectItem, { value: "viewer" }, "Viewer"),
+                React.createElement(SelectItem, { value: "employee" }, "Employee"),
+                // Seller option disabled - Employee ↔ Seller conversion not allowed
+                React.createElement(SelectItem, { value: "seller_products", disabled: true }, "Seller (Cannot change to Seller)")
+              )
+            )
+          ),
+
+          React.createElement(
+            DialogFooter,
+            null,
+            React.createElement(
+              Button,
+              { 
+                variant: "outline", 
+                onClick: () => {
+                  setIsRoleChangeModalOpen(false);
+                  setSelectedUser(null);
+                  setSelectedRoleForChange('');
+                },
+                disabled: isChangingRole
+              },
+              "Cancel"
+            ),
+            React.createElement(
+              Button, 
+              { 
+                onClick: handleSaveRoleChange,
+                disabled: isChangingRole || !selectedRoleForChange
+              },
+              isChangingRole ? "Updating..." : "Save Changes"
+            )
           )
         )
       )

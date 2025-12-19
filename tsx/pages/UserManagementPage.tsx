@@ -44,7 +44,8 @@ interface User {
   id: number;
   name: string;
   email: string;
-  role: string;
+  role: string; // Display label
+  roleValue?: string; // Original backend role value for operations
   status: string;
   joined: string;
   bids?: number;
@@ -64,6 +65,9 @@ export function UserManagementPage({ userRole }: UserManagementPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isRoleChangeModalOpen, setIsRoleChangeModalOpen] = useState(false);
+  const [selectedRoleForChange, setSelectedRoleForChange] = useState<string>('');
+  const [isChangingRole, setIsChangingRole] = useState(false);
   const [isAdjustBalanceModalOpen, setIsAdjustBalanceModalOpen] = useState(false);
   const [adjustAmount, setAdjustAmount] = useState('');
   const [adjustReason, setAdjustReason] = useState('');
@@ -88,13 +92,33 @@ export function UserManagementPage({ userRole }: UserManagementPageProps) {
 
       const response = await apiService.getUsers(params);
       
+      // Helper function to map backend role to display label
+      const mapRoleToLabel = (role: string): string => {
+        if (!role) return 'N/A';
+        const normalizedRole = role.toLowerCase().trim();
+        const roleMap: Record<string, string> = {
+          'superadmin': 'Super Admin',
+          'super_admin': 'Super Admin',
+          'admin': 'Super Admin',
+          'moderator': 'Moderator',
+          'viewer': 'Viewer',
+          'employee': 'Employee',
+          'seller_products': 'Seller',
+          'seller': 'Seller',
+          'company_products': 'Employee', // Company products are managed by employees
+          'buyer': 'Employee' // Buyer maps to Employee in admin panel
+        };
+        return roleMap[normalizedRole] || role.charAt(0).toUpperCase() + role.slice(1).replace(/_/g, ' ');
+      };
+      
       if (response.success && response.data) {
         const usersData = Array.isArray(response.data) ? response.data : response.data.users || [];
         setUsers(usersData.map((user: any) => ({
           id: user.id,
           name: user.name || `${user.phone || 'User'}`,
           email: user.email || '',
-          role: user.role || 'buyer',
+          role: mapRoleToLabel(user.role || 'buyer'), // Display label
+          roleValue: user.role || 'buyer', // Original backend role value for operations
           status: user.status === 'approved' ? 'Active' : user.status === 'suspended' ? 'Suspended' : 'Pending',
           joined: user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A',
           bids: user.total_bids || 0,
@@ -121,6 +145,123 @@ export function UserManagementPage({ userRole }: UserManagementPageProps) {
       toast.error('You do not have permission to perform this action', {
         description: 'Only Super Admins and Moderators can modify users'
       });
+    }
+  };
+
+  const handleChangeRoleClick = (user: User) => {
+    if (isReadOnly) {
+      toast.error('You do not have permission');
+      return;
+    }
+    
+    // Check if user is Seller - Seller role cannot be changed
+    const currentRoleValue = user.roleValue || (user.role?.toLowerCase() === 'seller' ? 'seller_products' : '');
+    if (currentRoleValue === 'seller_products') {
+      toast.error('Seller role cannot be changed');
+      return;
+    }
+    
+    setSelectedUser(user);
+    // Use roleValue (backend enum) directly - this is the source of truth
+    // roleValue comes from backend API response (user.role field)
+    let initialRole = user.roleValue;
+    
+    // Fallback: If roleValue not available, map from display label to backend enum
+    if (!initialRole) {
+      const roleLabel = user.role?.toLowerCase();
+      if (roleLabel === 'super admin') initialRole = 'superadmin';
+      else if (roleLabel === 'moderator') initialRole = 'moderator';
+      else if (roleLabel === 'viewer') initialRole = 'viewer';
+      else if (roleLabel === 'employee') {
+        // Employee can be either 'employee' or 'company_products' in backend
+        // Default to 'employee', user can change if needed
+        initialRole = 'employee';
+      }
+      else if (roleLabel === 'seller') initialRole = 'seller_products';
+      else initialRole = 'employee'; // fallback
+    }
+    
+    // Normalize company_products to employee (they both represent Employee role in admin panel)
+    if (initialRole === 'company_products') {
+      initialRole = 'employee';
+    }
+    
+    // Ensure we have a valid backend enum value
+    const validBackendRoles = ['superadmin', 'moderator', 'viewer', 'employee', 'seller_products'];
+    if (!initialRole || !validBackendRoles.includes(initialRole)) {
+      console.warn('Invalid role value, defaulting to employee:', initialRole);
+      initialRole = 'employee';
+    }
+    
+    setSelectedRoleForChange(initialRole);
+    setIsRoleChangeModalOpen(true);
+  };
+
+  const handleSaveRoleChange = async () => {
+    if (!selectedUser || !selectedRoleForChange) {
+      toast.error('Please select a role');
+      return;
+    }
+
+    if (isReadOnly) {
+      toast.error('You do not have permission');
+      return;
+    }
+
+    // UI Restriction: Block Employee ↔ Seller conversion
+    const currentRoleValue = selectedUser.roleValue || (selectedUser.role?.toLowerCase() === 'seller' ? 'seller_products' : 'employee');
+    
+    // Block changing TO Seller
+    if (selectedRoleForChange === 'seller_products') {
+      toast.error('Cannot change role to Seller. Seller role is fixed.');
+      return;
+    }
+    
+    // Block changing FROM Seller (already handled in handleChangeRoleClick, but double-check)
+    if (currentRoleValue === 'seller_products') {
+      toast.error('Seller role cannot be changed');
+      return;
+    }
+
+    // Ensure we're sending backend enum value, not UI label
+    let backendRoleValue = selectedRoleForChange; // This should already be backend enum
+    
+    // Normalize company_products to employee (they both represent Employee role)
+    if (backendRoleValue === 'company_products') {
+      backendRoleValue = 'employee';
+    }
+    
+    // Validate backend enum value before sending
+    const validBackendRoles = ['superadmin', 'moderator', 'viewer', 'employee', 'seller_products'];
+    if (!validBackendRoles.includes(backendRoleValue)) {
+      toast.error('Invalid role value. Please try again.');
+      console.error('Invalid role value sent to API:', backendRoleValue);
+      return;
+    }
+
+    try {
+      setIsChangingRole(true);
+      
+      // Send backend enum value to API (not UI label)
+      const response = await apiService.updateUserRole(selectedUser.id, backendRoleValue);
+      
+      if (response?.message || response?.user) {
+        // Success: Show toast, close modal, refresh list
+        toast.success(response.message || 'User role updated successfully');
+        setIsRoleChangeModalOpen(false);
+        setSelectedUser(null);
+        setSelectedRoleForChange('');
+        await loadUsers(); // Refresh user list
+      } else {
+        toast.error('Role change completed but unexpected response format');
+        await loadUsers(); // Still reload in case it worked
+      }
+    } catch (error: any) {
+      console.error('Change role error:', error);
+      const errorMessage = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to update user role';
+      toast.error(errorMessage);
+    } finally {
+      setIsChangingRole(false);
     }
   };
 
@@ -170,9 +311,12 @@ export function UserManagementPage({ userRole }: UserManagementPageProps) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Roles</SelectItem>
-                <SelectItem value="buyer">Buyer</SelectItem>
-                <SelectItem value="seller">Seller</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="superadmin">Super Admin</SelectItem>
+                <SelectItem value="moderator">Moderator</SelectItem>
+                <SelectItem value="viewer">Viewer</SelectItem>
+                <SelectItem value="employee">Employee</SelectItem>
+                <SelectItem value="seller_products">Seller</SelectItem>
+                <SelectItem value="company_products">Employee</SelectItem>
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -295,10 +439,12 @@ export function UserManagementPage({ userRole }: UserManagementPageProps) {
                             <Edit className="mr-2 h-4 w-4" />
                             Edit User
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Shield className="mr-2 h-4 w-4" />
-                            Change Role
-                          </DropdownMenuItem>
+                          {!isReadOnly && user.roleValue !== 'seller_products' && user.role?.toLowerCase() !== 'seller' && (
+                            <DropdownMenuItem onClick={() => handleChangeRoleClick(user)}>
+                              <Shield className="mr-2 h-4 w-4" />
+                              Change Role
+                            </DropdownMenuItem>
+                          )}
                           {user.status === 'Active' ? (
                             <DropdownMenuItem className="text-red-600">
                               <UserX className="mr-2 h-4 w-4" />
@@ -357,14 +503,17 @@ export function UserManagementPage({ userRole }: UserManagementPageProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Role</Label>
-                  <Select defaultValue={selectedUser.role.toLowerCase()}>
+                  <Select defaultValue={selectedUser.roleValue ? selectedUser.roleValue.toLowerCase() : selectedUser.role.toLowerCase()}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="buyer">Buyer</SelectItem>
-                      <SelectItem value="seller">Seller</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="superadmin">Super Admin</SelectItem>
+                      <SelectItem value="moderator">Moderator</SelectItem>
+                      <SelectItem value="viewer">Viewer</SelectItem>
+                      <SelectItem value="employee">Employee</SelectItem>
+                      <SelectItem value="seller_products">Seller</SelectItem>
+                      <SelectItem value="company_products">Employee</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -549,6 +698,72 @@ export function UserManagementPage({ userRole }: UserManagementPageProps) {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Role Modal */}
+      <Dialog open={isRoleChangeModalOpen} onOpenChange={setIsRoleChangeModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change User Role</DialogTitle>
+            <DialogDescription>Update the role for this user</DialogDescription>
+          </DialogHeader>
+          {selectedUser && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                <Avatar className="w-16 h-16">
+                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-500 text-white text-xl">
+                    {selectedUser.name.split(' ').map(n => n[0]).join('')}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium">{selectedUser.name}</p>
+                  <p className="text-sm text-gray-500">{selectedUser.email}</p>
+                  <p className="text-xs text-gray-400 mt-1">Current Role: {selectedUser.role}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>New Role</Label>
+                <Select 
+                  value={selectedRoleForChange} 
+                  onValueChange={setSelectedRoleForChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="superadmin">Super Admin</SelectItem>
+                    <SelectItem value="moderator">Moderator</SelectItem>
+                    <SelectItem value="viewer">Viewer</SelectItem>
+                    <SelectItem value="employee">Employee</SelectItem>
+                    {/* Seller option disabled - Employee ↔ Seller conversion not allowed */}
+                    <SelectItem value="seller_products" disabled>Seller (Cannot change to Seller)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsRoleChangeModalOpen(false);
+                    setSelectedUser(null);
+                    setSelectedRoleForChange('');
+                  }}
+                  disabled={isChangingRole}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSaveRoleChange}
+                  disabled={isChangingRole || !selectedRoleForChange}
+                >
+                  {isChangingRole ? 'Updating...' : 'Save Changes'}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

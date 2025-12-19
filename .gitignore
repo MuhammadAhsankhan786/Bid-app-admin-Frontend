@@ -1,3 +1,5 @@
 node_modules
 .env
 .vercel
+.admin_token
+ADMIN_API_TEST_REPORT.md
