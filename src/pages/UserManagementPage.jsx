@@ -68,7 +68,13 @@ export function UserManagementPage({ userRole }) {
           'company_products': 'Employee', // Company products are managed by employees
           'buyer': 'Employee' // Buyer maps to Employee in admin panel
         };
-        return roleMap[normalizedRole] || role.charAt(0).toUpperCase() + role.slice(1).replace(/_/g, ' ');
+        // Ensure we always return mapped value, never raw role
+        const mappedRole = roleMap[normalizedRole];
+        if (mappedRole) {
+          return mappedRole;
+        }
+        // Fallback: format unknown roles nicely
+        return role.charAt(0).toUpperCase() + role.slice(1).replace(/_/g, ' ');
       };
       
       const formattedUsers = (response.users || response.data || []).map(user => ({
