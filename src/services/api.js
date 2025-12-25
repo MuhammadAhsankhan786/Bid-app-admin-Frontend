@@ -8,36 +8,38 @@ import { getScopeFromToken } from '../utils/roleUtils';
  * - Can be overridden with VITE_BASE_URL environment variable or localStorage
  */
 function getBaseUrl() {
-  // Priority 1: Check localStorage for manual override (for testing)
+  // Priority 1: Check if running on localhost (ALWAYS use local URL on localhost)
+  // This takes priority over localStorage to ensure local testing works
+  const hostname = window.location.hostname;
+  const port = window.location.port;
+  const isLocalhost = hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '' ||
+    hostname.startsWith('192.168.') ||
+    hostname.startsWith('10.') ||
+    hostname.startsWith('172.');
+
+  // If on localhost, ALWAYS use local URL (ignore localStorage override)
+  if (isLocalhost) {
+    const localUrl = 'http://localhost:5000/api';
+    console.log('🌐 [Admin Panel] Localhost detected - Using LOCAL API:', localUrl);
+    console.log('   Hostname:', hostname, 'Port:', port);
+    console.log('   Make sure backend is running on http://localhost:5000');
+    console.log('   ⚠️  localStorage override ignored for localhost');
+    return localUrl;
+  }
+
+  // Priority 2: Check localStorage for manual override (only for non-localhost)
   const storedUrl = localStorage.getItem('API_BASE_URL');
   if (storedUrl && storedUrl.trim() !== '') {
     console.log('🌐 [Admin Panel] Using API URL from localStorage:', storedUrl);
     return storedUrl;
   }
 
-  // Priority 2: Check if running on localhost (ALWAYS use local URL on localhost)
-  const hostname = window.location.hostname;
-  const port = window.location.port;
-  const isLocalhost = hostname === 'localhost' || 
-                      hostname === '127.0.0.1' || 
-                      hostname === '' ||
-                      hostname.startsWith('192.168.') ||
-                      hostname.startsWith('10.') ||
-                      hostname.startsWith('172.');
-
-  // If on localhost, ALWAYS use local URL (ignore environment variables)
-  if (isLocalhost) {
-    const localUrl = 'http://localhost:5000/api';
-    console.log('🌐 [Admin Panel] Localhost detected - Using LOCAL API:', localUrl);
-    console.log('   Hostname:', hostname, 'Port:', port);
-    console.log('   Make sure backend is running on http://localhost:5000');
-    return localUrl;
-  }
-
   // Priority 3: Check Vite development mode
-  const isViteDev = import.meta.env.MODE === 'development' || 
-                    import.meta.env.DEV ||
-                    import.meta.env.PROD === false;
+  const isViteDev = import.meta.env.MODE === 'development' ||
+    import.meta.env.DEV ||
+    import.meta.env.PROD === false;
 
   // Use local URL if in development mode
   if (isViteDev || port === '3000' || port === '5173') {
@@ -78,7 +80,7 @@ api.interceptors.request.use((config) => {
   if (token) {
     // Verify token scope is "admin" (or undefined for backward compatibility)
     const scope = getScopeFromToken(token);
-    
+
     // If scope is "mobile", clear storage and force re-login
     if (scope === 'mobile') {
       console.warn('⚠️ [Admin Panel] Mobile-scope token detected. Clearing storage and forcing re-login.');
@@ -88,7 +90,7 @@ api.interceptors.request.use((config) => {
       // Reject the request
       return Promise.reject(new Error('Mobile token detected. Admin panel requires admin-scope token.'));
     }
-    
+
     // Only allow tokens with scope="admin" or no scope (backward compatibility)
     if (scope && scope !== 'admin') {
       console.warn('⚠️ [Admin Panel] Invalid token scope:', scope);
@@ -96,7 +98,7 @@ api.interceptors.request.use((config) => {
       window.location.href = '/';
       return Promise.reject(new Error('Invalid token scope for admin panel.'));
     }
-    
+
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
@@ -115,32 +117,32 @@ api.interceptors.response.use(
       window.location.href = '/';
       return Promise.reject(error);
     }
-    
+
     // Handle connection refused errors (backend not running) - AUTO-SWITCH to production
-    if ((error.code === 'ERR_NETWORK' || error.code === 'ECONNREFUSED' || 
-         (error.message && error.message.includes('ERR_CONNECTION_REFUSED'))) &&
-        !hasSwitchedToProduction) {
+    if ((error.code === 'ERR_NETWORK' || error.code === 'ECONNREFUSED' ||
+      (error.message && error.message.includes('ERR_CONNECTION_REFUSED'))) &&
+      !hasSwitchedToProduction) {
       const currentUrl = BASE_URL;
-      
+
       // If trying to connect to localhost and it fails, AUTO-SWITCH to production
       if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) {
         console.warn('⚠️ [Admin Panel] Local backend not accessible:', currentUrl);
         console.warn('   🔄 Auto-switching to PRODUCTION API...');
-        
+
         // Auto-switch to production
         localStorage.setItem('API_BASE_URL', 'https://api.mazaadati.com/api');
         hasSwitchedToProduction = true;
-        
+
         console.log('✅ [Admin Panel] Switched to PRODUCTION API: https://api.mazaadati.com/api');
         console.log('   💡 To switch back to local, run:');
         console.log('      localStorage.setItem("API_BASE_URL", "http://localhost:5000/api"); location.reload();');
-        
+
         // Reload page to use new URL
         window.location.reload();
         return Promise.reject(error);
       }
     }
-    
+
     return Promise.reject(error);
   }
 );
@@ -210,6 +212,14 @@ export const apiService = {
     return response.data;
   },
 
+  async changeAdminPhone(id, phone, confirmPassword) {
+    const response = await api.put(`/admin/users/${id}/change-admin-phone`, {
+      phone,
+      confirmPassword
+    });
+    return response.data;
+  },
+
   async updateUserRole(id, role) {
     const response = await api.put(`/admin/users/${id}/role`, { role });
     return response.data;
@@ -231,6 +241,11 @@ export const apiService = {
   },
 
   // Products
+  async createProduct(productData) {
+    const response = await api.post('/admin/products', productData);
+    return response.data;
+  },
+
   async getProducts(params = {}) {
     const response = await api.get('/admin/products', { params });
     return response.data;
@@ -326,6 +341,36 @@ export const apiService = {
     return response.data;
   },
 
+  async getCategories() {
+    const response = await api.get('/categories');
+    return response.data;
+  },
+
+  // Upload Images (Cloudinary) - Admin Panel
+  async uploadImage(file) {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await api.post('/uploads/admin/image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  async uploadImages(files) {
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append('images', file);
+    });
+    const response = await api.post('/uploads/admin/images', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
   async getTopProducts() {
     const response = await api.get('/admin/analytics/top-products');
     return response.data;
@@ -345,6 +390,16 @@ export const apiService = {
   // Notifications
   async getNotifications(params = {}) {
     const response = await api.get('/admin/notifications', { params });
+    return response.data;
+  },
+
+  async getNotificationSettings() {
+    const response = await api.get('/notifications/settings');
+    return response.data;
+  },
+
+  async updateNotificationSettings(settings) {
+    const response = await api.put('/notifications/settings', settings);
     return response.data;
   },
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Phone, Shield, Users, Eye as EyeIcon } from 'lucide-react';
+import { Phone, Shield, Users, Eye as EyeIcon, Briefcase } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -89,7 +89,8 @@ export function LoginPage({ onLogin }) {
     // These are placeholder examples - users should enter their actual database phone numbers
     'superadmin': '',
     'moderator': '',
-    'viewer': ''
+    'viewer': '',
+    'employee': ''
   };
 
   const roles = [
@@ -108,6 +109,14 @@ export function LoginPage({ onLogin }) {
       icon: Users,
       color: 'purple',
       phone: rolePhones.moderator
+    },
+    {
+      id: 'employee',
+      label: 'Employee',
+      subtitle: 'Manage company products only',
+      icon: Briefcase,
+      color: 'orange',
+      phone: rolePhones.employee
     },
     {
       id: 'viewer',
@@ -181,8 +190,8 @@ export function LoginPage({ onLogin }) {
         const role = data.role || data.user?.role;
         const normalizedRole = role?.toLowerCase();
         
-        // Check if user has admin role (superadmin, admin, moderator, viewer)
-        const adminRoles = ['superadmin', 'admin', 'moderator', 'viewer'];
+        // Check if user has admin role (superadmin, admin, moderator, viewer, employee)
+        const adminRoles = ['superadmin', 'admin', 'moderator', 'viewer', 'employee'];
         if (!normalizedRole || !adminRoles.includes(normalizedRole)) {
           console.error('❌ [Admin Panel] Non-admin user attempted login. Role:', normalizedRole);
           localStorage.removeItem('token');
@@ -220,6 +229,8 @@ export function LoginPage({ onLogin }) {
           window.location.hash = 'dashboard';
         } else if (normalizedRole === 'moderator') {
           window.location.hash = 'moderator-dashboard';
+        } else if (normalizedRole === 'employee') {
+          window.location.hash = 'dashboard'; // Employee goes to dashboard (Products page)
         } else if (normalizedRole === 'viewer') {
           window.location.hash = 'viewer-dashboard';
         } else {
@@ -241,6 +252,7 @@ export function LoginPage({ onLogin }) {
     if (!selectedRole) return 'Admin';
     if (selectedRole === 'superadmin') return 'Super Admin';
     if (selectedRole === 'moderator') return 'Moderator';
+    if (selectedRole === 'employee') return 'Employee';
     if (selectedRole === 'viewer') return 'Viewer';
     return 'Admin';
   };
@@ -250,6 +262,7 @@ export function LoginPage({ onLogin }) {
     if (!selectedRole) return 'text-gray-900 dark:text-white';
     if (selectedRole === 'superadmin') return 'text-blue-600 dark:text-blue-400';
     if (selectedRole === 'moderator') return 'text-purple-600 dark:text-purple-400';
+    if (selectedRole === 'employee') return 'text-orange-600 dark:text-orange-400';
     if (selectedRole === 'viewer') return 'text-green-600 dark:text-green-400';
     return 'text-gray-900 dark:text-white';
   };
@@ -283,6 +296,9 @@ export function LoginPage({ onLogin }) {
                   purple: isSelected 
                     ? 'border-purple-600 bg-purple-50 dark:bg-purple-950' 
                     : 'border-gray-200 dark:border-gray-800 hover:border-purple-300',
+                  orange: isSelected 
+                    ? 'border-orange-600 bg-orange-50 dark:bg-orange-950' 
+                    : 'border-gray-200 dark:border-gray-800 hover:border-orange-300',
                   green: isSelected 
                     ? 'border-green-600 bg-green-50 dark:bg-green-950' 
                     : 'border-gray-200 dark:border-gray-800 hover:border-green-300'
@@ -290,11 +306,13 @@ export function LoginPage({ onLogin }) {
                 const iconColorClasses = {
                   blue: isSelected ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700',
                   purple: isSelected ? 'bg-purple-600' : 'bg-gray-200 dark:bg-gray-700',
+                  orange: isSelected ? 'bg-orange-600' : 'bg-gray-200 dark:bg-gray-700',
                   green: isSelected ? 'bg-green-600' : 'bg-gray-200 dark:bg-gray-700'
                 };
                 const checkColorClasses = {
                   blue: 'bg-blue-600',
                   purple: 'bg-purple-600',
+                  orange: 'bg-orange-600',
                   green: 'bg-green-600'
                 };
 

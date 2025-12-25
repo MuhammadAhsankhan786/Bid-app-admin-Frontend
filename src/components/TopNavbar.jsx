@@ -5,7 +5,8 @@ import { useTheme } from './ThemeProvider';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback } from './ui/avatar';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { apiService as api } from '../services/api';
 
 import { getRoleFromToken } from '../utils/roleUtils';
 
@@ -18,31 +19,63 @@ export function TopNavbar({
     theme,
     toggleTheme
   } = useTheme();
-  
+
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    fetchUnreadCount();
+    // Poll every 60 seconds
+    const interval = setInterval(fetchUnreadCount, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchUnreadCount = async () => {
+    try {
+      // Fetch unread notifications
+      const response = await api.getNotifications({ read: 'false', limit: 1 });
+      if (response && response.data) {
+        // Since the API returns a list, we can count it. 
+        // Ideally, we'd have a count endpoint, but checking the length of filtered response is okay for now if we fetched sufficient limit.
+        // Wait, if we use limit=1, we only know if there's at least 1.
+        // Let's fetch the count properly or rely on the response structure.
+        // The getNotifications controller calls pool.query with LIMIT.
+        // It doesn't return a total count in the top level unless we change it.
+        // However, 'getAllNotifications' (admin view) returns pagination.total. 
+        // 'getNotifications' (user view) just returns rows.
+        // Let's call with larger limit to get a count, but this is inefficient.
+        // Better: Fetch with read=false. 
+        const res = await api.getNotifications({ read: 'false', limit: 99 });
+        setUnreadCount(res.data.length);
+      }
+    } catch (error) {
+      console.error("Failed to fetch notification count:", error);
+    }
+  };
+
   // Get role display info
   const getRoleInfo = () => {
     const normalizedRole = userRole === 'superadmin' ? 'super-admin' : userRole;
-    
+
     const roleDisplay = {
       'super-admin': 'Super Admin',
       'superadmin': 'Super Admin',
       'moderator': 'Moderator',
       'viewer': 'Viewer'
     };
-    
+
     const roleColors = {
       'super-admin': 'bg-blue-600 text-white',
       'superadmin': 'bg-blue-600 text-white',
       'moderator': 'bg-purple-600 text-white',
       'viewer': 'bg-green-600 text-white'
     };
-    
+
     return {
       label: roleDisplay[normalizedRole] || 'Admin',
       color: roleColors[normalizedRole] || 'bg-gray-600 text-white'
     };
   };
-  
+
   const roleInfo = getRoleInfo();
   return /*#__PURE__*/React.createElement("div", {
     className: "h-16 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 md:px-6"
@@ -85,9 +118,9 @@ export function TopNavbar({
     onClick: () => onNavigate('notifications')
   }, /*#__PURE__*/React.createElement(Bell, {
     className: "h-5 w-5"
-  }), /*#__PURE__*/React.createElement(Badge, {
+  }), unreadCount > 0 && /*#__PURE__*/React.createElement(Badge, {
     className: "absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-red-500"
-  }, "3")), /*#__PURE__*/React.createElement(DropdownMenu, null, /*#__PURE__*/React.createElement(DropdownMenuTrigger, {
+  }, unreadCount > 99 ? '99+' : unreadCount)), /*#__PURE__*/React.createElement(DropdownMenu, null, /*#__PURE__*/React.createElement(DropdownMenuTrigger, {
     asChild: true
   }, /*#__PURE__*/React.createElement(Button, {
     variant: "ghost",

@@ -73,6 +73,12 @@ export const ROLE_ACCESS = {
     'Auctions',
     'Referrals',
     'WalletLogs'
+  ],
+  employee: [
+    'Dashboard', // Required landing page, but content will be masked
+    'Products', // Employee can access Products to add company products
+    'Auctions', // Employee can view auctions
+    'Categories' // Employee needs categories to create products
   ]
 };
 
@@ -84,10 +90,10 @@ export const ROLE_ACCESS = {
  */
 export const hasModuleAccess = (userRole, moduleLabel) => {
   if (!userRole || !moduleLabel) return false;
-  
+
   // Normalize role (handle both 'super-admin' and 'superadmin')
   const normalizedRole = userRole === 'super-admin' ? 'superadmin' : userRole.toLowerCase();
-  
+
   const allowedModules = ROLE_ACCESS[normalizedRole] || [];
   return allowedModules.includes(moduleLabel);
 };
@@ -100,12 +106,12 @@ export const hasModuleAccess = (userRole, moduleLabel) => {
  */
 export const hasPageAccess = (userRole, pageId) => {
   if (!userRole || !pageId) return false;
-  
+
   // Normalize role
   const normalizedRole = userRole === 'super-admin' ? 'superadmin' : userRole.toLowerCase();
-  
+
   const allowedModules = ROLE_ACCESS[normalizedRole] || [];
-  
+
   // Check if any allowed module maps to this page
   return allowedModules.some(module => {
     const modulePage = MODULE_TO_PAGE[module];
@@ -120,18 +126,18 @@ export const hasPageAccess = (userRole, pageId) => {
  */
 export const getAccessiblePages = (userRole) => {
   if (!userRole) return [];
-  
+
   // Normalize role
   const normalizedRole = userRole === 'super-admin' ? 'superadmin' : userRole.toLowerCase();
-  
+
   const allowedModules = ROLE_ACCESS[normalizedRole] || [];
   const pages = new Set();
-  
+
   allowedModules.forEach(module => {
     const page = MODULE_TO_PAGE[module];
     if (page) pages.add(page);
   });
-  
+
   return Array.from(pages);
 };
 

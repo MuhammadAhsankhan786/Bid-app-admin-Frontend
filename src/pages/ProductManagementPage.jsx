@@ -2,7 +2,7 @@
 // 100% READY TO USE
 
 import { useState, useEffect, Fragment } from 'react';
-import { Search, Clock, CheckCircle, XCircle, Flag, Eye, Timer, Lock, Edit, Trash2, Trophy } from 'lucide-react';
+import { Search, Clock, CheckCircle, XCircle, Flag, Eye, Timer, Lock, Edit, Trash2, Trophy, Plus } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
@@ -58,8 +58,23 @@ export function ProductManagementPage({ userRole }) {
   const [selectedProductId, setSelectedProductId] = useState(null);
   const [selectedProductName, setSelectedProductName] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [createFormData, setCreateFormData] = useState({
+    title: '',
+    description: '',
+    startingPrice: '',
+    duration: 1,
+    category_id: '',
+    image_url: '',
+    images: []
+  });
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [categories, setCategories] = useState([]);
   const isReadOnly = userRole === 'viewer';
   const canDelete = userRole === 'superadmin' || userRole === 'super-admin';
+  const canCreate = userRole === 'superadmin' || userRole === 'super-admin' || userRole === 'moderator' || userRole === 'employee';
   
   // Debug: Log role information
   console.log('[ProductManagement] User Role:', userRole);
@@ -68,7 +83,133 @@ export function ProductManagementPage({ userRole }) {
 
   useEffect(() => {
     loadProducts();
+    loadCategories();
   }, [completedPage]);
+
+  const loadCategories = async () => {
+    try {
+      const cats = await apiService.getCategories();
+      setCategories(Array.isArray(cats) ? cats : cats?.data || []);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+      setCategories([]);
+    }
+  };
+
+  const handleFileChange = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    // Validate file types
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    const invalidFiles = files.filter(file => !allowedTypes.includes(file.type));
+    if (invalidFiles.length > 0) {
+      toast.error('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.');
+      return;
+    }
+
+    // Validate file sizes (5MB max)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    const oversizedFiles = files.filter(file => file.size > maxSize);
+    if (oversizedFiles.length > 0) {
+      toast.error('File size too large. Maximum size is 5MB per image.');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      // Upload all files at once using uploadImages (faster - single API call)
+      const uploadResult = await apiService.uploadImages(files);
+      
+      // Extract URLs from upload results
+      const uploadedImages = uploadResult.data || uploadResult || [];
+      const uploadedUrls = uploadedImages.map(img => img.url || img.data?.url).filter(url => url);
+      
+      if (uploadedUrls.length === 0) {
+        toast.error('Failed to upload images. Please try again.');
+        return;
+      }
+
+      // Update form data with uploaded URLs
+      setCreateFormData(prev => ({
+        ...prev,
+        image_url: uploadedUrls[0] || prev.image_url,
+        images: uploadedUrls
+      }));
+      setUploadedFiles(uploadedUrls);
+      
+      toast.success(`${uploadedUrls.length} image(s) uploaded successfully!`);
+    } catch (error) {
+      console.error('Error uploading images:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to upload images';
+      toast.error('Failed to upload images', { description: errorMessage });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemoveImage = (index) => {
+    const newImages = createFormData.images.filter((_, i) => i !== index);
+    setCreateFormData(prev => ({
+      ...prev,
+      images: newImages,
+      image_url: newImages[0] || prev.image_url
+    }));
+    setUploadedFiles(newImages);
+  };
+
+  const handleCreateProduct = async () => {
+    if (!createFormData.title || !createFormData.startingPrice || !createFormData.category_id) {
+      toast.error('Please fill all required fields');
+      return;
+    }
+
+    // Check if at least one image is provided (either uploaded or URL)
+    if (!createFormData.image_url && createFormData.images.length === 0) {
+      toast.error('Please upload at least one image or provide an image URL');
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      await apiService.createProduct({
+        title: createFormData.title,
+        description: createFormData.description || null,
+        startingPrice: parseFloat(createFormData.startingPrice),
+        duration: parseInt(createFormData.duration) || 1,
+        category_id: parseInt(createFormData.category_id),
+        image_url: createFormData.image_url || null,
+        images: createFormData.images.length > 0 ? createFormData.images : (createFormData.image_url ? [createFormData.image_url] : [])
+      });
+      
+      // Close modal immediately and reset form (don't wait for loadProducts)
+      setIsCreateModalOpen(false);
+      setCreateFormData({
+        title: '',
+        description: '',
+        startingPrice: '',
+        duration: 1,
+        category_id: '',
+        image_url: '',
+        images: []
+      });
+      setUploadedFiles([]);
+      
+      toast.success('Company product created successfully! It is now pending approval.');
+      
+      // Refresh products in background (don't block UI)
+      loadProducts().catch(err => {
+        console.error('Error refreshing products:', err);
+        // Silent fail - user already sees success message
+      });
+    } catch (error) {
+      console.error('Error creating product:', error);
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to create product';
+      toast.error('Failed to create product', { description: errorMessage });
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   const loadProducts = async () => {
     try {
@@ -311,15 +452,40 @@ export function ProductManagementPage({ userRole }) {
 
   const formatTimeAgo = (date) => {
     if (!date) return 'Just now';
-    const now = new Date();
-    const past = new Date(date);
-    const diff = now - past;
-    const mins = diff / 60000;
-    if (mins < 1) return 'Just now';
-    if (mins < 60) return `${Math.floor(mins)} min ago`;
-    const hours = mins / 60;
-    if (hours < 24) return `${Math.floor(hours)} hours ago`;
-    return `${Math.floor(hours / 24)} days ago`;
+    
+    try {
+      const now = new Date();
+      // Handle both string and Date object
+      // If it's already a Date object, use it; otherwise parse it
+      let past;
+      if (date instanceof Date) {
+        past = date;
+      } else if (typeof date === 'string') {
+        // Parse ISO string or other date formats
+        past = new Date(date);
+      } else {
+        past = new Date(date);
+      }
+      
+      // Check if date is valid
+      if (isNaN(past.getTime())) {
+        console.warn('Invalid date:', date);
+        return 'Just now';
+      }
+      
+      const diff = now.getTime() - past.getTime();
+      const mins = diff / 60000;
+      
+      // If negative (future date) or less than 1 minute, return "Just now"
+      if (diff < 0 || mins < 1) return 'Just now';
+      if (mins < 60) return `${Math.floor(mins)} min ago`;
+      const hours = mins / 60;
+      if (hours < 24) return `${Math.floor(hours)} hours ago`;
+      return `${Math.floor(hours / 24)} days ago`;
+    } catch (error) {
+      console.error('Error formatting time:', error, date);
+      return 'Just now';
+    }
   };
 
   const filteredPending = pendingProducts.filter((p) =>
@@ -543,6 +709,18 @@ export function ProductManagementPage({ userRole }) {
                           </Badge>
                         </div>
                       )}
+                      {selectedProduct.created_at && (
+                        <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">Created</p>
+                          <p className="text-xs font-medium text-gray-900 dark:text-white">{formatTimeAgo(selectedProduct.created_at)}</p>
+                        </div>
+                      )}
+                      {selectedProduct.approved_at && (
+                        <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">Approved</p>
+                          <p className="text-xs font-medium text-gray-900 dark:text-white">{formatTimeAgo(selectedProduct.approved_at)}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -595,19 +773,24 @@ export function ProductManagementPage({ userRole }) {
                         </Badge>
                       </div>
                     )}
+                    {selectedProduct.created_at && (
+                      <div>
+                        <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-500 dark:text-gray-400 mb-0.5">Created</p>
+                        <p className="text-[10px] sm:text-xs text-gray-900 dark:text-white">{formatTimeAgo(selectedProduct.created_at)}</p>
+                      </div>
+                    )}
+                    {selectedProduct.approved_at && (
+                      <div>
+                        <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-500 dark:text-gray-400 mb-0.5">Approved</p>
+                        <p className="text-[10px] sm:text-xs text-gray-900 dark:text-white">{formatTimeAgo(selectedProduct.approved_at)}</p>
+                      </div>
+                    )}
                   </div>
 
                   <div>
                     <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-500 dark:text-gray-400 mb-0.5">Description</p>
                     <p className="text-[10px] sm:text-xs leading-tight text-gray-700 dark:text-gray-300 break-words line-clamp-2">{selectedProduct.description || selectedProduct.desc || 'No description provided.'}</p>
                   </div>
-
-                  {selectedProduct.created_at && (
-                    <div>
-                      <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-500 dark:text-gray-400 mb-0.5">Submitted</p>
-                      <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-600 dark:text-gray-400">{formatTimeAgo(selectedProduct.created_at)}</p>
-                    </div>
-                  )}
                 </>
               )}
             </div>
@@ -705,11 +888,23 @@ export function ProductManagementPage({ userRole }) {
         </div>
       )}
 
-      <div>
-        <h1 className="text-gray-900 dark:text-white mb-1">Products & Auctions</h1>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Manage product approvals and live auctions
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-gray-900 dark:text-white mb-1">Products & Auctions</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Manage product approvals and live auctions
+          </p>
+        </div>
+        {canCreate && !isReadOnly && (
+          <Button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Add Company Product</span>
+            <span className="sm:hidden">Add</span>
+          </Button>
+        )}
       </div>
 
       <Tabs defaultValue={canViewPendingProducts ? "pending" : "live"} className="space-y-6" onValueChange={setActiveTab}>
@@ -773,14 +968,15 @@ export function ProductManagementPage({ userRole }) {
                       <TableHead>Seller</TableHead>
                       <TableHead>Category</TableHead>
                       <TableHead>Starting Bid</TableHead>
-                      <TableHead>Submitted</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Approved</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loading ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8">
+                        <TableCell colSpan={7} className="text-center py-8">
                           <InlineLoader message="Loading products..." />
                         </TableCell>
                       </TableRow>
@@ -820,7 +1016,10 @@ export function ProductManagementPage({ userRole }) {
                             ${parseFloat(product.starting_bid || product.price || 0).toFixed(2)}
                           </TableCell>
                           <TableCell className="text-sm text-gray-600 dark:text-gray-400">
-                            {formatTimeAgo(product.created_at)}
+                            {product.created_at ? formatTimeAgo(product.created_at) : 'N/A'}
+                          </TableCell>
+                          <TableCell className="text-sm text-gray-600 dark:text-gray-400">
+                            {product.approved_at ? formatTimeAgo(product.approved_at) : product.status === 'approved' ? 'Just now' : 'Pending'}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1 sm:gap-2 flex-wrap">
@@ -930,7 +1129,7 @@ export function ProductManagementPage({ userRole }) {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                        <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                           No pending products found
                         </TableCell>
                       </TableRow>
@@ -1353,6 +1552,254 @@ export function ProductManagementPage({ userRole }) {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Create Product Modal */}
+      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+        <DialogContent className="max-w-2xl w-[95vw] sm:w-full p-0 flex flex-col max-h-[90vh]">
+          <DialogHeader className="px-4 sm:px-6 pt-3 sm:pt-4 pb-2 sm:pb-3 flex-shrink-0 border-b">
+            <DialogTitle className="text-base sm:text-lg">Add Company Product</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
+              Create a new company product. It will be pending approval after creation.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 px-4 sm:px-6 py-4 overflow-y-auto flex-1 min-h-0" style={{ maxHeight: 'calc(90vh - 140px)' }}>
+            {/* Row 1: Title and Category */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Title */}
+              <div className="w-full">
+                <Label htmlFor="create-title" className="text-sm font-semibold block mb-1.5">
+                  Product Title <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="create-title"
+                  value={createFormData.title}
+                  onChange={(e) => setCreateFormData({ ...createFormData, title: e.target.value })}
+                  placeholder="e.g., Apple iPhone 15 Pro Max"
+                  className="w-full"
+                />
+              </div>
+
+              {/* Category */}
+              <div className="w-full">
+                <Label htmlFor="create-category" className="text-sm font-semibold block mb-1.5">
+                  Category <span className="text-red-500">*</span>
+                </Label>
+                <select
+                  id="create-category"
+                  value={createFormData.category_id}
+                  onChange={(e) => setCreateFormData({ ...createFormData, category_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Category</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Row 2: Description (Full Width) */}
+            <div className="w-full">
+              <Label htmlFor="create-description" className="text-sm font-semibold block mb-1.5">
+                Description
+              </Label>
+              <Textarea
+                id="create-description"
+                value={createFormData.description}
+                onChange={(e) => setCreateFormData({ ...createFormData, description: e.target.value })}
+                placeholder="Describe the product features, condition, specifications..."
+                className="w-full min-h-[90px] resize-none"
+                rows={3}
+              />
+            </div>
+
+            {/* Row 3: Starting Price and Duration */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Starting Price */}
+              <div className="w-full">
+                <Label htmlFor="create-price" className="text-sm font-semibold block mb-1.5">
+                  Starting Price ($) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="create-price"
+                  type="number"
+                  step="0.01"
+                  value={createFormData.startingPrice}
+                  onChange={(e) => setCreateFormData({ ...createFormData, startingPrice: e.target.value })}
+                  placeholder="0.00"
+                  className="w-full"
+                />
+              </div>
+
+              {/* Duration */}
+              <div className="w-full">
+                <Label htmlFor="create-duration" className="text-sm font-semibold block mb-1.5">
+                  Auction Duration (Days) <span className="text-red-500">*</span>
+                </Label>
+                <select
+                  id="create-duration"
+                  value={createFormData.duration}
+                  onChange={(e) => setCreateFormData({ ...createFormData, duration: parseInt(e.target.value) })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value={1}>1 Day</option>
+                  <option value={2}>2 Days</option>
+                  <option value={3}>3 Days</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Image Upload - Cloudinary */}
+            <div className="w-full">
+              <Label htmlFor="create-image-upload" className="text-sm font-semibold block mb-1.5">
+                Product Images <span className="text-red-500">*</span>
+              </Label>
+              <div className="space-y-2">
+                {/* File Upload Input */}
+                <label
+                  htmlFor="create-image-upload"
+                  className="flex-1 cursor-pointer block"
+                >
+                  <div className={`flex items-center justify-center w-full h-24 border-2 border-dashed rounded-lg transition-colors ${
+                    isUploading 
+                      ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20' 
+                      : 'border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-400 bg-gray-50 dark:bg-gray-900'
+                  }`}>
+                    {isUploading ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="animate-spin rounded-full h-7 w-7 border-2 border-blue-600 border-t-transparent"></div>
+                        <p className="text-xs font-medium text-blue-600 dark:text-blue-400">Uploading images...</p>
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400">Please wait</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1">
+                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          <span className="text-blue-600 dark:text-blue-400 font-medium">Click to upload</span> or drag and drop
+                        </p>
+                        <p className="text-[10px] text-gray-500">PNG, JPG, GIF, WebP (Max 5MB)</p>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    id="create-image-upload"
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                    multiple
+                    onChange={handleFileChange}
+                    className="hidden"
+                    disabled={isUploading || isCreating}
+                  />
+                </label>
+
+                {/* Uploaded Images Preview - Compact */}
+                {(createFormData.images.length > 0 || isUploading) && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {/* Show loading placeholders while uploading */}
+                    {isUploading && createFormData.images.length === 0 && (
+                      <div className="relative flex-shrink-0">
+                        <div className="w-16 h-16 rounded border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                        </div>
+                        <div className="absolute inset-0 bg-black bg-opacity-30 rounded flex items-center justify-center">
+                          <p className="text-[8px] text-white font-medium">Uploading...</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Show uploaded images */}
+                    {createFormData.images.map((url, index) => (
+                      <div key={index} className="relative group flex-shrink-0">
+                        <img
+                          src={url}
+                          alt={`Preview ${index + 1}`}
+                          className="w-16 h-16 object-cover rounded border border-gray-300 dark:border-gray-700"
+                        />
+                        {/* Show loading overlay if still uploading */}
+                        {isUploading && index === createFormData.images.length - 1 && (
+                          <div className="absolute inset-0 bg-black bg-opacity-40 rounded flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(index)}
+                          className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-100 group-hover:opacity-100 transition-opacity shadow-sm"
+                          disabled={isCreating || isUploading}
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  ☁️ Images will be uploaded to Cloudinary. At least one image is required.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="px-4 sm:px-6 pb-4 pt-3 border-t bg-background flex-shrink-0 sticky bottom-0 z-10">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 w-full">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsCreateModalOpen(false);
+                  setCreateFormData({
+                    title: '',
+                    description: '',
+                    startingPrice: '',
+                    duration: 1,
+                    category_id: '',
+                    image_url: '',
+                    images: []
+                  });
+                  setUploadedFiles([]);
+                }}
+                disabled={isCreating || isUploading}
+                className="w-full sm:w-auto min-w-[100px]"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateProduct}
+                disabled={
+                  isCreating || 
+                  isUploading || 
+                  !createFormData.title || 
+                  !createFormData.startingPrice || 
+                  !createFormData.category_id || 
+                  (createFormData.images.length === 0 && !createFormData.image_url)
+                }
+                className="w-full sm:w-auto min-w-[140px] bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed relative"
+              >
+                {isCreating ? (
+                  <span className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    <span>Creating Product...</span>
+                  </span>
+                ) : isUploading ? (
+                  <span className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    <span>Uploading...</span>
+                  </span>
+                ) : (
+                  'Create Product'
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

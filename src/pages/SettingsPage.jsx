@@ -38,6 +38,8 @@ import { Badge } from "../components/ui/badge";
 import { toast } from "sonner";
 import { getScopeFromToken } from "../utils/roleUtils";
 
+import { apiService } from "../services/api";
+
 export function SettingsPage({ userRole }) {
   const normalizedRole =
     userRole === "superadmin" ? "super-admin" : userRole;
@@ -47,7 +49,182 @@ export function SettingsPage({ userRole }) {
   const [isSaving, setIsSaving] = useState(false);
   const [logoUrl, setLogoUrl] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Admin Phone Change State
+  const [adminPhone, setAdminPhone] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
+  const [userId, setUserId] = useState(null);
+
   const fileInputRef = useRef(null);
+
+  const [currentModPhone, setCurrentModPhone] = useState("");
+  const [modPhone, setModPhone] = useState("");
+  const [modConfirmPassword, setModConfirmPassword] = useState("");
+  const [isUpdatingMod, setIsUpdatingMod] = useState(false);
+
+  // Note: We no longer fetch all moderators on mount since we look up by phone
+
+  const handleUpdateModerator = async () => {
+    if (!currentModPhone) {
+      toast.error("Please enter the current moderator phone");
+      return;
+    }
+    if (!modPhone) {
+      toast.error("Please enter a new phone number");
+      return;
+    }
+    if (!modPhone.startsWith("+964") || modPhone.length < 13) {
+      toast.error("Invalid new phone format. Must start with +964 and have 10 digits.");
+      return;
+    }
+    if (!modConfirmPassword) {
+      toast.error("Please confirm your superadmin password");
+      return;
+    }
+
+    try {
+      setIsUpdatingMod(true);
+
+      // Step 1: Find the moderator by their current phone
+      const usersResponse = await apiService.getUsers({ search: currentModPhone.trim() });
+      const users = usersResponse.users || usersResponse || [];
+
+      // Strict match on phone (ignoring spaces if needed, but exact match is safer)
+      // The search API uses ILIKE, so we might get partial matches. We filter for exact match or normalized match.
+      const targetUser = users.find(u =>
+        u.phone === currentModPhone.trim() ||
+        u.phone.replace(/\s/g, '') === currentModPhone.replace(/\s/g, '')
+      );
+
+      if (!targetUser) {
+        toast.error("❌ Moderator with this phone number not found.");
+        return;
+      }
+
+      if (targetUser.role !== 'moderator') {
+        toast.error(`❌ User found but role is '${targetUser.role}', not 'moderator'.`);
+        return;
+      }
+
+      console.log("🚀 Updating Moderator Phone...");
+      console.log("   ModeratorID:", targetUser.id);
+
+      // Step 2: Call update API
+      const response = await apiService.changeAdminPhone(
+        targetUser.id,
+        modPhone,
+        modConfirmPassword
+      );
+
+      console.log("✅ API Response:", response);
+
+      if (response && (response.success || response.message)) {
+        toast.success("✅ Moderator phone number updated successfully!");
+        setModPhone("");
+        setCurrentModPhone(""); // Clear the inputs
+        setModConfirmPassword("");
+      } else {
+        toast.success("✅ Phone updated (Response OK)");
+        setModPhone("");
+        setCurrentModPhone("");
+        setModConfirmPassword("");
+      }
+    } catch (error) {
+      console.error("❌ Update moderator phone error:", error);
+      const errorMsg =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to update moderator phone";
+      toast.error(`❌ ${errorMsg}`);
+    } finally {
+      setIsUpdatingMod(false);
+    }
+  };
+
+  useEffect(() => {
+    // Extract User ID from token
+    const token = localStorage.getItem("token");
+    if (token) {
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+          if (payload.id) {
+            setUserId(payload.id);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to decode token for user ID", e);
+      }
+    }
+  }, []);
+
+  const handleUpdatePhone = async (e) => {
+    if (e) e.preventDefault();
+
+    console.log("🖱️ 'Update Phone' button clicked");
+    console.log("   Phone:", adminPhone);
+    console.log("   Password provided:", !!confirmPassword);
+    console.log("   UserID:", userId);
+
+    if (!adminPhone) {
+      toast.error("Please enter a new phone number");
+      return;
+    }
+    // Basic format validation
+    if (!adminPhone.startsWith("+964") || adminPhone.length < 13) {
+      toast.error("Invalid phone format. Must start with +964 and have 10 digits.");
+      return;
+    }
+
+    if (!confirmPassword) {
+      toast.error("Please confirm your password");
+      return;
+    }
+    if (!userId) {
+      console.error("❌ User ID is missing from state");
+      toast.error("User ID not found. Please log in again.");
+      return;
+    }
+
+    try {
+      setIsUpdatingPhone(true);
+      console.log("🚀 Sending PUT request to update phone...");
+
+      // Use existing API endpoint via service
+      const response = await apiService.changeAdminPhone(
+        userId,
+        adminPhone,
+        confirmPassword
+      );
+
+      console.log("✅ API Response:", response);
+
+      if (response && (response.success || response.message)) {
+        toast.success("✅ Phone number updated successfully!");
+        setAdminPhone("");
+        setConfirmPassword("");
+      } else {
+        console.warn("⚠️ Unexpected API response:", response);
+        toast.success("✅ Phone updated (Response OK)"); // Fallback success if 200 OK but no success flag
+        setAdminPhone("");
+        setConfirmPassword("");
+      }
+    } catch (error) {
+      console.error("❌ Update phone error:", error);
+      const errorMsg =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to update phone number";
+
+      toast.error(`❌ ${errorMsg}`);
+    } finally {
+      setIsUpdatingPhone(false);
+    }
+  };
 
   const handleSave = () => {
     setIsSaving(true);
@@ -105,11 +282,11 @@ export function SettingsPage({ userRole }) {
       formData.append("logo", file);
 
       const token = localStorage.getItem("token");
-      
+
       // Validate token scope before making request
       if (token) {
         const scope = getScopeFromToken(token);
-        
+
         // If scope is "mobile", clear storage and reject
         if (scope === 'mobile') {
           console.warn('⚠️ [Admin Panel] Mobile-scope token detected in SettingsPage. Clearing storage.');
@@ -117,7 +294,7 @@ export function SettingsPage({ userRole }) {
           window.location.href = '/';
           throw new Error('Invalid token scope. Please login again.');
         }
-        
+
         // Only allow tokens with scope="admin" or no scope (backward compatibility)
         if (scope && scope !== 'admin') {
           console.warn('⚠️ [Admin Panel] Invalid token scope in SettingsPage:', scope);
@@ -126,7 +303,7 @@ export function SettingsPage({ userRole }) {
           throw new Error('Invalid token scope. Please login again.');
         }
       }
-      
+
       // Get base URL based on environment
       function getBaseUrl() {
         const envUrl = import.meta.env?.VITE_BASE_URL || import.meta.env?.REACT_APP_BASE_URL;
@@ -134,10 +311,10 @@ export function SettingsPage({ userRole }) {
           return envUrl;
         }
 
-        const isDevelopment = import.meta.env?.MODE === 'development' || 
-                              import.meta.env?.DEV || 
-                              window.location.hostname === 'localhost' ||
-                              window.location.hostname === '127.0.0.1';
+        const isDevelopment = import.meta.env?.MODE === 'development' ||
+          import.meta.env?.DEV ||
+          window.location.hostname === 'localhost' ||
+          window.location.hostname === '127.0.0.1';
 
         if (isDevelopment) {
           return 'http://localhost:5000/api';
@@ -184,11 +361,11 @@ export function SettingsPage({ userRole }) {
       const loadCurrentLogo = async () => {
         try {
           const token = localStorage.getItem("token");
-          
+
           // Validate token scope before making request
           if (token) {
             const scope = getScopeFromToken(token);
-            
+
             // If scope is "mobile", clear storage and reject
             if (scope === 'mobile') {
               console.warn('⚠️ [Admin Panel] Mobile-scope token detected in SettingsPage. Clearing storage.');
@@ -196,7 +373,7 @@ export function SettingsPage({ userRole }) {
               window.location.href = '/';
               return;
             }
-            
+
             // Only allow tokens with scope="admin" or no scope (backward compatibility)
             if (scope && scope !== 'admin') {
               console.warn('⚠️ [Admin Panel] Invalid token scope in SettingsPage:', scope);
@@ -205,7 +382,7 @@ export function SettingsPage({ userRole }) {
               return;
             }
           }
-          
+
           // Get base URL based on environment
           function getBaseUrl() {
             const envUrl = import.meta.env?.VITE_BASE_URL || import.meta.env?.REACT_APP_BASE_URL;
@@ -213,10 +390,10 @@ export function SettingsPage({ userRole }) {
               return envUrl;
             }
 
-            const isDevelopment = import.meta.env?.MODE === 'development' || 
-                                  import.meta.env?.DEV || 
-                                  window.location.hostname === 'localhost' ||
-                                  window.location.hostname === '127.0.0.1';
+            const isDevelopment = import.meta.env?.MODE === 'development' ||
+              import.meta.env?.DEV ||
+              window.location.hostname === 'localhost' ||
+              window.location.hostname === '127.0.0.1';
 
             if (isDevelopment) {
               return 'http://localhost:5000/api';
@@ -224,7 +401,7 @@ export function SettingsPage({ userRole }) {
 
             return 'https://api.mazaadati.com/api';
           }
-          
+
           const baseURL = getBaseUrl();
           const response = await fetch(`${baseURL}/admin/settings/logo`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -266,75 +443,121 @@ export function SettingsPage({ userRole }) {
         </Button>
       </div>
 
-      {/* --- Appearance / Logo Section --- */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Branding & Theme</CardTitle>
-          <CardDescription>Customize the look and feel</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label>Platform Logo</Label>
-            <div className="flex items-center gap-4">
-              <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center text-white text-2xl overflow-hidden">
-                {logoUrl ? (
-                  <img
-                    src={logoUrl}
-                    alt="Platform Logo"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  "BM"
-                )}
+      {/* --- Admin Account Security Section (Superadmin Only) --- */}
+      {isSuperAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Admin Account Security</CardTitle>
+            <CardDescription>
+              Manage your super admin account credentials
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-4">
+              <div className="grid gap-2">
+                <Label htmlFor="admin-phone">Change Phone Number</Label>
+                <div className="flex gap-4 items-start">
+                  <div className="flex-1 space-y-2">
+                    <Input
+                      id="admin-phone"
+                      placeholder="+964750XXXXXXX"
+                      value={adminPhone}
+                      onChange={(e) => setAdminPhone(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Format: +964XXXXXXXXXX (Iraq format)
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              {isSuperAdmin && (
-                <>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/jpg,image/svg+xml"
-                    className="hidden"
-                    onChange={handleLogoUpload}
-                    disabled={isUploading}
-                  />
-                  <Button
-                    variant="outline"
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    {isUploading ? "Uploading..." : "Upload New Logo"}
-                  </Button>
-                </>
-              )}
+              <div className="grid gap-2">
+                <Label htmlFor="confirm-password">
+                  Confirm Password <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  placeholder="Enter your password to confirm"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleUpdatePhone}
+                  disabled={isUpdatingPhone || !adminPhone || !confirmPassword}
+                >
+                  {isUpdatingPhone ? "Updating..." : "Update Phone Number"}
+                </Button>
+              </div>
             </div>
-          </div>
 
-          <Separator />
+            <Separator className="my-6" />
 
-          {/* --- Reset Section --- */}
-          <div className="p-4 bg-orange-50 dark:bg-orange-950 rounded-lg">
-            <p className="text-sm text-orange-900 dark:text-orange-100 mb-2">
-              ⚠️ Danger Zone
-            </p>
-            <p className="text-xs text-orange-700 dark:text-orange-400 mb-3">
-              These actions cannot be undone. Please be careful.
-            </p>
+            {/* --- Moderator Phone Section --- */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Change Moderator Phone Number</h3>
+              <p className="text-sm text-gray-500">
+                Update the phone number for a moderator account.
+              </p>
 
-            {isSuperAdmin && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleResetSettings}
-              >
-                Reset All Settings
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label>Current Moderator Phone</Label>
+                  <Input
+                    placeholder="Enter current phone (e.g., +964...)"
+                    value={currentModPhone}
+                    onChange={(e) => setCurrentModPhone(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    This must match the moderator's existing phone number exactly.
+                  </p>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="mod-phone">New Moderator Phone</Label>
+                  <Input
+                    id="mod-phone"
+                    placeholder="+9647XXXXXXXXX"
+                    value={modPhone}
+                    onChange={(e) => setModPhone(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Format: +964XXXXXXXXXX (Iraq format)
+                  </p>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="mod-confirm-password">
+                    Confirm Superadmin Password <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="mod-confirm-password"
+                    type="password"
+                    placeholder="Enter YOUR superadmin password"
+                    value={modConfirmPassword}
+                    onChange={(e) => setModConfirmPassword(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleUpdateModerator}
+                  disabled={isUpdatingMod || !currentModPhone || !modPhone || !modConfirmPassword}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  {isUpdatingMod ? "Updating..." : "Update Moderator Phone"}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* --- Appearance Section Removed --- */}
     </div>
   );
 }

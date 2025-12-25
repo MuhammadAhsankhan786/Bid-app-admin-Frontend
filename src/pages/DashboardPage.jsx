@@ -36,19 +36,19 @@ export function DashboardPage({ userRole }) {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      
+
       // Build array of promises conditionally based on role
       const promises = [
         apiService.getDashboard(),
         apiService.getDashboardCharts('week'),
         apiService.getDashboardCategories()
       ];
-      
+
       // Only fetch pending products if user has access (not for viewers)
       if (canViewPendingProducts) {
         promises.push(apiService.getPendingProducts());
       }
-      
+
       const results = await Promise.all(promises);
       const dashboard = results[0];
       const charts = results[1];
@@ -150,18 +150,95 @@ export function DashboardPage({ userRole }) {
     return React.createElement(PageLoader, { message: "Loading dashboard..." });
   }
 
+  // Special Dashboard View for Employee
+  if (normalizedRole === 'employee') {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-gray-900 dark:text-white mb-1">Employee Dashboard</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Manage your Company Products
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Card className="hover:border-blue-500 transition-colors cursor-pointer" onClick={() => window.location.hash = 'products'}>
+            <CardHeader className="pb-2">
+              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mb-2">
+                <Package className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <CardTitle>Manage Products</CardTitle>
+              <CardDescription>View and edit company products</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button variant="ghost" className="w-full justify-between group">
+                Go to Products
+                <Package className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:border-purple-500 transition-colors cursor-pointer" onClick={() => window.location.hash = 'categories'}>
+            <CardHeader className="pb-2">
+              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center mb-2">
+                <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <CardTitle>Categories</CardTitle>
+              <CardDescription>View product categories</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button variant="ghost" className="w-full justify-between group">
+                View Categories
+                <Activity className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Company Product Responsibilities</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center flex-shrink-0 mt-0.5">1</div>
+              <div>
+                <h4 className="font-medium text-sm">Upload Products</h4>
+                <p className="text-sm text-muted-foreground">Add high-quality images and detailed descriptions.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 mt-0.5">2</div>
+              <div>
+                <h4 className="font-medium text-sm">Manage Listings</h4>
+                <p className="text-sm text-muted-foreground">Edit or remove company products as needed.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center flex-shrink-0 mt-0.5">3</div>
+              <div>
+                <h4 className="font-medium text-sm">Monitor Approval</h4>
+                <p className="text-sm text-muted-foreground">Ensure products meet quality standards for customers.</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return React.createElement(
     "div",
     { className: "space-y-6" },
 
-      React.createElement(
+    React.createElement(
       "div",
       null,
       React.createElement("h1", { className: "text-gray-900 dark:text-white mb-1" }, "Dashboard Overview"),
-      React.createElement("p", { className: "text-sm text-gray-600 dark:text-gray-400" }, 
-        `Welcome back, ${normalizedRole === 'super-admin' || normalizedRole === 'superadmin' ? 'Super Admin' : 
-          normalizedRole === 'moderator' ? 'Moderator' : 
-          normalizedRole === 'viewer' ? 'Viewer' : 'Admin'}`
+      React.createElement("p", { className: "text-sm text-gray-600 dark:text-gray-400" },
+        `Welcome back, ${normalizedRole === 'super-admin' || normalizedRole === 'superadmin' ? 'Super Admin' :
+          normalizedRole === 'moderator' ? 'Moderator' :
+            normalizedRole === 'viewer' ? 'Viewer' : 'Admin'}`
       )
     ),
 

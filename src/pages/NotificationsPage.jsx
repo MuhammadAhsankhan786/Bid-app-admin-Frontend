@@ -7,32 +7,45 @@ import { Label } from '../components/ui/label';
 import { Separator } from '../components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import api from '../services/api';
+import { apiService as api } from '../services/api';
 
 export function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all'); // 'all', 'read', 'unread'
+  const [settings, setSettings] = useState({
+    email_notifications: true,
+    product_approvals: true,
+    user_reports: true,
+    high_value_bids: true,
+    system_updates: true,
+    security_alerts: true
+  });
+  const [isLoadingSettings, setIsLoadingSettings] = useState(false);
 
   useEffect(() => {
     loadNotifications();
+
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(loadNotifications, 30000);
+    return () => clearInterval(interval);
   }, [filter]);
 
   const loadNotifications = async () => {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const params = {};
       if (filter === 'read') {
         params.read = 'true';
       } else if (filter === 'unread') {
         params.read = 'false';
       }
-      
+
       const response = await api.getNotifications(params);
-      
+
       // Transform backend data to match frontend format
       const transformedNotifications = (response.data || []).map(notif => ({
         id: notif.id,
@@ -44,7 +57,7 @@ export function NotificationsPage() {
         user_name: notif.user_name,
         user_email: notif.user_email,
       }));
-      
+
       setNotifications(transformedNotifications);
     } catch (err) {
       console.error('Error loading notifications:', err);
@@ -67,6 +80,38 @@ export function NotificationsPage() {
     if (days < 7) return `${days} day${days > 1 ? 's' : ''} ago`;
     return date.toLocaleDateString();
   };
+
+  const loadSettings = async () => {
+    try {
+      setIsLoadingSettings(true);
+      const response = await api.getNotificationSettings();
+      if (response && response.data) {
+        setSettings(response.data);
+      }
+    } catch (err) {
+      console.error('Error loading settings:', err);
+    } finally {
+      setIsLoadingSettings(false);
+    }
+  };
+
+  const handleSettingChange = async (key, value) => {
+    try {
+      // Optimistic update
+      const newSettings = { ...settings, [key]: value };
+      setSettings(newSettings);
+
+      await api.updateNotificationSettings({ [key]: value });
+    } catch (err) {
+      console.error('Error updating settings:', err);
+      // Revert on error
+      setSettings(settings);
+    }
+  };
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
 
   const getNotificationIcon = (type) => {
     switch (type?.toLowerCase()) {
@@ -191,11 +236,11 @@ export function NotificationsPage() {
                 <div className="text-center py-12">
                   <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-600">
-                    {filter === 'unread' 
-                      ? 'No unread notifications' 
+                    {filter === 'unread'
+                      ? 'No unread notifications'
                       : filter === 'read'
-                      ? 'No read notifications'
-                      : 'No notifications yet'}
+                        ? 'No read notifications'
+                        : 'No notifications yet'}
                   </p>
                 </div>
               ) : (
@@ -204,15 +249,14 @@ export function NotificationsPage() {
                     const Icon = getNotificationIcon(notification.type);
                     const iconColor = getNotificationColor(notification.type);
                     const bgColor = getNotificationBgColor(notification.type);
-                    
+
                     return (
                       <div
                         key={notification.id}
-                        className={`p-4 rounded-lg border transition-all hover:shadow-md ${
-                          notification.read
-                            ? 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950'
-                            : 'border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30'
-                        }`}
+                        className={`p-4 rounded-lg border transition-all hover:shadow-md ${notification.read
+                          ? 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950'
+                          : 'border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30'
+                          }`}
                       >
                         <div className="flex items-start gap-4">
                           <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${bgColor}`}>
@@ -265,55 +309,79 @@ export function NotificationsPage() {
               <CardDescription>Customize your notification preferences</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label>Email Notifications</Label>
-                    <p className="text-sm text-gray-500">Receive notifications via email</p>
-                  </div>
-                  <Switch defaultChecked={true} />
+              {isLoadingSettings ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
                 </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label>Product Approvals</Label>
-                    <p className="text-sm text-gray-500">Alert when new products need approval</p>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label>Email Notifications</Label>
+                      <p className="text-sm text-gray-500">Receive notifications via email</p>
+                    </div>
+                    <Switch
+                      checked={settings.email_notifications}
+                      onCheckedChange={(checked) => handleSettingChange('email_notifications', checked)}
+                    />
                   </div>
-                  <Switch defaultChecked={true} />
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label>User Reports</Label>
-                    <p className="text-sm text-gray-500">Alert when users are reported</p>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label>Product Approvals</Label>
+                      <p className="text-sm text-gray-500">Alert when new products need approval</p>
+                    </div>
+                    <Switch
+                      checked={settings.product_approvals}
+                      onCheckedChange={(checked) => handleSettingChange('product_approvals', checked)}
+                    />
                   </div>
-                  <Switch defaultChecked={true} />
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label>High-Value Bids</Label>
-                    <p className="text-sm text-gray-500">Alert for bids over $1,000</p>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label>User Reports</Label>
+                      <p className="text-sm text-gray-500">Alert when users are reported</p>
+                    </div>
+                    <Switch
+                      checked={settings.user_reports}
+                      onCheckedChange={(checked) => handleSettingChange('user_reports', checked)}
+                    />
                   </div>
-                  <Switch defaultChecked={true} />
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label>System Updates</Label>
-                    <p className="text-sm text-gray-500">Important platform announcements</p>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label>High-Value Bids</Label>
+                      <p className="text-sm text-gray-500">Alert for bids over $1,000</p>
+                    </div>
+                    <Switch
+                      checked={settings.high_value_bids}
+                      onCheckedChange={(checked) => handleSettingChange('high_value_bids', checked)}
+                    />
                   </div>
-                  <Switch defaultChecked={true} />
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label>Security Alerts</Label>
-                    <p className="text-sm text-gray-500">Login attempts and security events</p>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label>System Updates</Label>
+                      <p className="text-sm text-gray-500">Important platform announcements</p>
+                    </div>
+                    <Switch
+                      checked={settings.system_updates}
+                      onCheckedChange={(checked) => handleSettingChange('system_updates', checked)}
+                    />
                   </div>
-                  <Switch defaultChecked={true} />
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label>Security Alerts</Label>
+                      <p className="text-sm text-gray-500">Login attempts and security events</p>
+                    </div>
+                    <Switch
+                      checked={settings.security_alerts}
+                      onCheckedChange={(checked) => handleSettingChange('security_alerts', checked)}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

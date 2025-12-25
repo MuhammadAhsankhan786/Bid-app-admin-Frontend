@@ -25,6 +25,14 @@ export function UserManagementPage({ userRole }) {
   const [isRoleChangeModalOpen, setIsRoleChangeModalOpen] = useState(false);
   const [selectedRoleForChange, setSelectedRoleForChange] = useState('');
   const [isChangingRole, setIsChangingRole] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    role: '',
+    status: ''
+  });
+  const [isSaving, setIsSaving] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
@@ -81,6 +89,7 @@ export function UserManagementPage({ userRole }) {
         id: user.id,
         name: user.name,
         email: user.email,
+        phone: user.phone || 'N/A', // Add phone number
         role: mapRoleToLabel(user.role), // Display label
         roleValue: user.role, // Original backend role value for operations
         status: user.status ? user.status.charAt(0).toUpperCase() + user.status.slice(1) : 'Active',
@@ -573,7 +582,17 @@ export function UserManagementPage({ userRole }) {
                                 ),
                                 React.createElement(
                                   DropdownMenuItem,
-                                  { onClick: () => { setSelectedUser(user); setIsEditModalOpen(true); } },
+                                  { onClick: () => { 
+                                    setSelectedUser(user); 
+                                    setEditFormData({
+                                      name: user.name || '',
+                                      email: user.email || '',
+                                      phone: user.phone || '',
+                                      role: user.roleValue || user.role || '',
+                                      status: user.status?.toLowerCase() || 'active'
+                                    });
+                                    setIsEditModalOpen(true); 
+                                  } },
                                   React.createElement(Edit, { className: "mr-2 h-4 w-4" }), "Edit User"
                                 ),
                                 !isReadOnly && (user.roleValue !== 'seller_products' && user.role?.toLowerCase() !== 'seller') && React.createElement(
@@ -695,46 +714,111 @@ export function UserManagementPage({ userRole }) {
 
           React.createElement(
             "div",
-            { className: "grid grid-cols-2 gap-4" },
+            { className: "space-y-4" },
+            
+            // Name Field
             React.createElement(
               "div",
               { className: "space-y-2" },
-              React.createElement(Label, null, "Role"),
-                React.createElement(
-                  Select,
-                  { defaultValue: selectedUser.roleValue ? selectedUser.roleValue.toLowerCase() : selectedUser.role.toLowerCase() },
-                React.createElement(SelectTrigger, null,
-                  React.createElement(SelectValue, null)
-                ),
-                React.createElement(
-                  SelectContent,
-                  null,
-                  React.createElement(SelectItem, { value: "superadmin" }, "Super Admin"),
-                  React.createElement(SelectItem, { value: "moderator" }, "Moderator"),
-                  React.createElement(SelectItem, { value: "viewer" }, "Viewer"),
-                  React.createElement(SelectItem, { value: "employee" }, "Employee"),
-                  React.createElement(SelectItem, { value: "seller_products" }, "Seller"),
-                  React.createElement(SelectItem, { value: "company_products" }, "Employee")
-                )
+              React.createElement(Label, null, "Name"),
+              React.createElement(Input, {
+                value: editFormData.name,
+                onChange: (e) => setEditFormData({ ...editFormData, name: e.target.value }),
+                placeholder: "User name"
+              })
+            ),
+
+            // Email Field
+            React.createElement(
+              "div",
+              { className: "space-y-2" },
+              React.createElement(Label, null, "Email"),
+              React.createElement(Input, {
+                type: "email",
+                value: editFormData.email,
+                onChange: (e) => setEditFormData({ ...editFormData, email: e.target.value }),
+                placeholder: "user@example.com"
+              })
+            ),
+
+            // Phone Number Field (NEW) - Disabled for Super Admin/Moderator
+            React.createElement(
+              "div",
+              { className: "space-y-2" },
+              React.createElement(Label, null, "Phone Number"),
+              React.createElement(Input, {
+                type: "tel",
+                value: editFormData.phone,
+                onChange: (e) => setEditFormData({ ...editFormData, phone: e.target.value }),
+                placeholder: "+964 750 123 4567",
+                disabled: selectedUser?.roleValue?.toLowerCase() === 'superadmin' || 
+                         selectedUser?.roleValue?.toLowerCase() === 'admin' || 
+                         selectedUser?.roleValue?.toLowerCase() === 'moderator' ||
+                         selectedUser?.role?.toLowerCase() === 'super admin' ||
+                         selectedUser?.role?.toLowerCase() === 'moderator'
+              }),
+              (selectedUser?.roleValue?.toLowerCase() === 'superadmin' || 
+               selectedUser?.roleValue?.toLowerCase() === 'admin' || 
+               selectedUser?.roleValue?.toLowerCase() === 'moderator' ||
+               selectedUser?.role?.toLowerCase() === 'super admin' ||
+               selectedUser?.role?.toLowerCase() === 'moderator') && React.createElement(
+                "p",
+                { className: "text-xs text-amber-600 dark:text-amber-400 mt-1" },
+                "⚠️ Phone number is fixed for Super Admin/Moderator for login security"
               )
             ),
 
+            // Role and Status Grid
             React.createElement(
               "div",
-              { className: "space-y-2" },
-              React.createElement(Label, null, "Status"),
+              { className: "grid grid-cols-2 gap-4" },
               React.createElement(
-                Select,
-                { defaultValue: selectedUser.status.toLowerCase() },
-                React.createElement(SelectTrigger, null,
-                  React.createElement(SelectValue, null)
-                ),
+                "div",
+                { className: "space-y-2" },
+                React.createElement(Label, null, "Role"),
+                  React.createElement(
+                    Select,
+                    { 
+                      value: editFormData.role,
+                      onValueChange: (value) => setEditFormData({ ...editFormData, role: value })
+                    },
+                  React.createElement(SelectTrigger, null,
+                    React.createElement(SelectValue, null)
+                  ),
+                  React.createElement(
+                    SelectContent,
+                    null,
+                    React.createElement(SelectItem, { value: "superadmin" }, "Super Admin"),
+                    React.createElement(SelectItem, { value: "moderator" }, "Moderator"),
+                    React.createElement(SelectItem, { value: "viewer" }, "Viewer"),
+                    React.createElement(SelectItem, { value: "employee" }, "Employee"),
+                    React.createElement(SelectItem, { value: "seller_products" }, "Seller"),
+                    React.createElement(SelectItem, { value: "company_products" }, "Employee")
+                  )
+                )
+              ),
+
+              React.createElement(
+                "div",
+                { className: "space-y-2" },
+                React.createElement(Label, null, "Status"),
                 React.createElement(
-                  SelectContent,
-                  null,
-                  React.createElement(SelectItem, { value: "active" }, "Active"),
-                  React.createElement(SelectItem, { value: "suspended" }, "Suspended"),
-                  React.createElement(SelectItem, { value: "pending" }, "Pending")
+                  Select,
+                  { 
+                    value: editFormData.status,
+                    onValueChange: (value) => setEditFormData({ ...editFormData, status: value })
+                  },
+                  React.createElement(SelectTrigger, null,
+                    React.createElement(SelectValue, null)
+                  ),
+                  React.createElement(
+                    SelectContent,
+                    null,
+                    React.createElement(SelectItem, { value: "active" }, "Active"),
+                    React.createElement(SelectItem, { value: "approved" }, "Approved"),
+                    React.createElement(SelectItem, { value: "suspended" }, "Suspended"),
+                    React.createElement(SelectItem, { value: "pending" }, "Pending")
+                  )
                 )
               )
             )
@@ -763,10 +847,70 @@ export function UserManagementPage({ userRole }) {
             null,
             React.createElement(
               Button,
-              { variant: "outline", onClick: () => setIsEditModalOpen(false) },
+              { 
+                variant: "outline", 
+                onClick: () => {
+                  setIsEditModalOpen(false);
+                  setEditFormData({ name: '', email: '', phone: '', role: '', status: '' });
+                },
+                disabled: isSaving
+              },
               "Cancel"
             ),
-            React.createElement(Button, null, "Save Changes")
+            React.createElement(
+              Button, 
+              { 
+                onClick: async () => {
+                  if (!selectedUser || isReadOnly) {
+                    toast.error('You do not have permission');
+                    return;
+                  }
+
+                  try {
+                    setIsSaving(true);
+                    
+                    // CRITICAL: Block phone number update for Super Admin/Moderator
+                    const userRole = selectedUser.roleValue?.toLowerCase() || selectedUser.role?.toLowerCase() || '';
+                    const isProtectedRole = userRole === 'superadmin' || userRole === 'admin' || userRole === 'moderator' || userRole === 'super admin';
+                    
+                    if (isProtectedRole && editFormData.phone !== undefined && editFormData.phone !== selectedUser.phone) {
+                      toast.error('Cannot update phone number for Super Admin or Moderator. Phone number is fixed for login security.');
+                      setIsSaving(false);
+                      return;
+                    }
+                    
+                    const updateData = {};
+                    if (editFormData.name) updateData.name = editFormData.name;
+                    if (editFormData.email) updateData.email = editFormData.email;
+                    // Only include phone if user is not Super Admin/Moderator
+                    if (!isProtectedRole && editFormData.phone !== undefined && editFormData.phone !== '') {
+                      updateData.phone = editFormData.phone;
+                    }
+                    if (editFormData.status) updateData.status = editFormData.status === 'active' ? 'approved' : editFormData.status;
+
+                    const response = await apiService.updateUser(selectedUser.id, updateData);
+                    
+                    if (response?.message || response?.user) {
+                      toast.success(response.message || 'User updated successfully');
+                      setIsEditModalOpen(false);
+                      setEditFormData({ name: '', email: '', phone: '', role: '', status: '' });
+                      await loadUsers();
+                    } else {
+                      toast.error('Update completed but unexpected response format');
+                      await loadUsers();
+                    }
+                  } catch (error) {
+                    console.error('Update user error:', error);
+                    const errorMessage = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to update user';
+                    toast.error(errorMessage);
+                  } finally {
+                    setIsSaving(false);
+                  }
+                },
+                disabled: isSaving
+              },
+              isSaving ? 'Saving...' : 'Save Changes'
+            )
           )
         )
       )
