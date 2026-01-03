@@ -59,7 +59,7 @@ export function UserManagementPage({ userRole }) {
       if (statusFilter !== 'all') params.status = statusFilter === 'active' ? 'approved' : statusFilter;
 
       const response = await apiService.getUsers(params);
-      
+
       // Helper function to map backend role to display label
       const mapRoleToLabel = (role) => {
         if (!role) return 'N/A';
@@ -84,7 +84,7 @@ export function UserManagementPage({ userRole }) {
         // Fallback: format unknown roles nicely
         return role.charAt(0).toUpperCase() + role.slice(1).replace(/_/g, ' ');
       };
-      
+
       const formattedUsers = (response.users || response.data || []).map(user => ({
         id: user.id,
         name: user.name,
@@ -97,11 +97,11 @@ export function UserManagementPage({ userRole }) {
         bids: user.bids_count || 0
       }));
       setUsers(formattedUsers);
-      
+
       // Backend returns: { users: [...], pagination: { total, pages, page, limit } }
       const total = response.pagination?.total || response.total || formattedUsers.length;
       const limit = 20;
-      
+
       // Calculate total pages - ensure it's at least 1
       let finalTotalPages = 1;
       if (response.pagination?.pages) {
@@ -109,7 +109,7 @@ export function UserManagementPage({ userRole }) {
       } else if (total > 0) {
         finalTotalPages = Math.ceil(total / limit);
       }
-      
+
       setTotalUsers(total);
       setTotalPages(finalTotalPages);
     } catch (error) {
@@ -123,7 +123,7 @@ export function UserManagementPage({ userRole }) {
 
   const handleDelete = async (userId) => {
     if (isReadOnly || !canDelete) return toast.error('You do not have permission to delete users');
-    try { 
+    try {
       const response = await apiService.deleteUser(userId);
       if (response?.success || response?.message) {
         toast.success(response.message || 'User deleted successfully');
@@ -132,7 +132,7 @@ export function UserManagementPage({ userRole }) {
         toast.error('Delete completed but unexpected response format');
         loadUsers(); // Still reload in case it worked
       }
-    } catch (error) { 
+    } catch (error) {
       console.error('Delete user error:', error);
       const errorMessage = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to delete user';
       toast.error(errorMessage);
@@ -141,7 +141,7 @@ export function UserManagementPage({ userRole }) {
 
   const handleApprove = async (userId) => {
     if (isReadOnly) return toast.error('You do not have permission');
-    try { 
+    try {
       const response = await apiService.approveUser(userId);
       if (response?.message || response?.user) {
         toast.success(response.message || 'User approved successfully');
@@ -150,7 +150,7 @@ export function UserManagementPage({ userRole }) {
         toast.error('Approve completed but unexpected response format');
         loadUsers(); // Still reload in case it worked
       }
-    } catch (error) { 
+    } catch (error) {
       console.error('Approve user error:', error);
       const errorMessage = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to approve user';
       toast.error(errorMessage);
@@ -159,7 +159,7 @@ export function UserManagementPage({ userRole }) {
 
   const handleBlock = async (userId) => {
     if (isReadOnly) return toast.error('You do not have permission');
-    try { 
+    try {
       const response = await apiService.blockUser(userId);
       if (response?.message || response?.user) {
         toast.success(response.message || 'User blocked successfully');
@@ -168,7 +168,7 @@ export function UserManagementPage({ userRole }) {
         toast.error('Block completed but unexpected response format');
         loadUsers(); // Still reload in case it worked
       }
-    } catch (error) { 
+    } catch (error) {
       console.error('Block user error:', error);
       const errorMessage = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to block user';
       toast.error(errorMessage);
@@ -177,19 +177,19 @@ export function UserManagementPage({ userRole }) {
 
   const handleChangeRoleClick = (user) => {
     if (isReadOnly) return toast.error('You do not have permission');
-    
+
     // Check if user is Seller - Seller role cannot be changed
     const currentRoleValue = user.roleValue || (user.role?.toLowerCase() === 'seller' ? 'seller_products' : '');
     if (currentRoleValue === 'seller_products') {
       toast.error('Seller role cannot be changed');
       return;
     }
-    
+
     setSelectedUser(user);
     // Use roleValue (backend enum) directly - this is the source of truth
     // roleValue comes from backend API response (user.role field)
     let initialRole = user.roleValue;
-    
+
     // Fallback: If roleValue not available, map from display label to backend enum
     if (!initialRole) {
       const roleLabel = user.role?.toLowerCase();
@@ -204,19 +204,19 @@ export function UserManagementPage({ userRole }) {
       else if (roleLabel === 'seller') initialRole = 'seller_products';
       else initialRole = 'employee'; // fallback
     }
-    
+
     // Normalize company_products to employee (they both represent Employee role in admin panel)
     if (initialRole === 'company_products') {
       initialRole = 'employee';
     }
-    
+
     // Ensure we have a valid backend enum value
     const validBackendRoles = ['superadmin', 'moderator', 'viewer', 'employee', 'seller_products'];
     if (!initialRole || !validBackendRoles.includes(initialRole)) {
       console.warn('Invalid role value, defaulting to employee:', initialRole);
       initialRole = 'employee';
     }
-    
+
     setSelectedRoleForChange(initialRole);
     setIsRoleChangeModalOpen(true);
   };
@@ -235,13 +235,13 @@ export function UserManagementPage({ userRole }) {
     if (currentRoleValue === 'company_products') {
       currentRoleValue = 'employee';
     }
-    
+
     // Block changing TO Seller
     if (selectedRoleForChange === 'seller_products') {
       toast.error('Cannot change role to Seller. Seller role is fixed.');
       return;
     }
-    
+
     // Block changing FROM Seller (already handled in handleChangeRoleClick, but double-check)
     if (currentRoleValue === 'seller_products') {
       toast.error('Seller role cannot be changed');
@@ -250,12 +250,12 @@ export function UserManagementPage({ userRole }) {
 
     // Ensure we're sending backend enum value, not UI label
     let backendRoleValue = selectedRoleForChange; // This should already be backend enum
-    
+
     // Normalize company_products to employee (they both represent Employee role)
     if (backendRoleValue === 'company_products') {
       backendRoleValue = 'employee';
     }
-    
+
     // Validate backend enum value before sending
     const validBackendRoles = ['superadmin', 'moderator', 'viewer', 'employee', 'seller_products'];
     if (!validBackendRoles.includes(backendRoleValue)) {
@@ -266,10 +266,10 @@ export function UserManagementPage({ userRole }) {
 
     try {
       setIsChangingRole(true);
-      
+
       // Send backend enum value to API (not UI label)
       const response = await apiService.updateUserRole(selectedUser.id, backendRoleValue);
-      
+
       if (response?.message || response?.user) {
         // Success: Show toast, close modal, refresh list
         toast.success(response.message || 'User role updated successfully');
@@ -484,157 +484,159 @@ export function UserManagementPage({ userRole }) {
         loading
           ? React.createElement(InlineLoader, { message: "Loading users..." })
           : React.createElement(
-              "div",
-              { className: "overflow-x-auto" },
+            "div",
+            { className: "overflow-x-auto" },
+            React.createElement(
+              Table,
+              null,
               React.createElement(
-                Table,
+                TableHeader,
                 null,
                 React.createElement(
-                  TableHeader,
+                  TableRow,
                   null,
-                  React.createElement(
-                    TableRow,
-                    null,
-                    React.createElement(TableHead, null, "User"),
-                    React.createElement(TableHead, null, "Role"),
-                    React.createElement(TableHead, null, "Status"),
-                    React.createElement(TableHead, null, "Joined"),
-                    React.createElement(TableHead, null, "Total Bids"),
-                    React.createElement(TableHead, { className: "text-right" }, "Actions")
-                  )
-                ),
+                  React.createElement(TableHead, null, "User"),
+                  React.createElement(TableHead, null, "Role"),
+                  React.createElement(TableHead, null, "Status"),
+                  React.createElement(TableHead, null, "Joined"),
+                  React.createElement(TableHead, null, "Total Bids"),
+                  React.createElement(TableHead, { className: "text-right" }, "Actions")
+                )
+              ),
 
-                React.createElement(
-                  TableBody,
-                  null,
-                  users.length > 0
-                    ? users.map(user =>
+              React.createElement(
+                TableBody,
+                null,
+                users.length > 0
+                  ? users.map(user =>
+                    React.createElement(
+                      TableRow,
+                      { key: user.id, className: "hover:bg-gray-50 dark:hover:bg-gray-900" },
+                      React.createElement(
+                        TableCell,
+                        null,
                         React.createElement(
-                          TableRow,
-                          { key: user.id, className: "hover:bg-gray-50 dark:hover:bg-gray-900" },
+                          "div",
+                          { className: "flex items-center gap-3" },
                           React.createElement(
-                            TableCell,
+                            Avatar,
                             null,
                             React.createElement(
-                              "div",
-                              { className: "flex items-center gap-3" },
-                              React.createElement(
-                                Avatar,
-                                null,
-                                React.createElement(
-                                  AvatarFallback,
-                                  { className: "bg-gradient-to-br from-blue-500 to-purple-500 text-white" },
-                                  user.name.split(' ').map(n => n[0]).join('')
-                                )
-                              ),
-                              React.createElement(
-                                "div",
-                                null,
-                                React.createElement("p", { className: "text-sm" }, user.name),
-                                React.createElement("p", { className: "text-xs text-gray-500" }, user.email)
-                              )
+                              AvatarFallback,
+                              { className: "bg-gradient-to-br from-blue-500 to-purple-500 text-white" },
+                              user.name.split(' ').map(n => n[0]).join('')
                             )
                           ),
-                          React.createElement(TableCell, null,
-                            React.createElement(Badge, { variant: "outline" }, user.role)
-                          ),
-                          React.createElement(TableCell, null,
-                            React.createElement(Badge, {
-                              variant:
-                                user.status === 'Active' || user.status === 'Approved'
-                                  ? 'default'
-                                  : user.status === 'Suspended' || user.status === 'Blocked'
-                                  ? 'destructive'
-                                  : 'secondary'
-                            }, user.status)
-                          ),
-                          React.createElement(TableCell, { className: "text-sm text-gray-600 dark:text-gray-400" }, user.joined),
-                          React.createElement(TableCell, { className: "text-sm" }, user.bids),
-
-                          // Actions
                           React.createElement(
-                            TableCell,
-                            { className: "text-right" },
+                            "div",
+                            null,
+                            React.createElement("p", { className: "text-sm" }, user.name),
+                            React.createElement("p", { className: "text-xs text-gray-500" }, user.email)
+                          )
+                        )
+                      ),
+                      React.createElement(TableCell, null,
+                        React.createElement(Badge, { variant: "outline" }, user.role)
+                      ),
+                      React.createElement(TableCell, null,
+                        React.createElement(Badge, {
+                          variant:
+                            user.status === 'Active' || user.status === 'Approved'
+                              ? 'default'
+                              : user.status === 'Suspended' || user.status === 'Blocked'
+                                ? 'destructive'
+                                : 'secondary'
+                        }, user.status)
+                      ),
+                      React.createElement(TableCell, { className: "text-sm text-gray-600 dark:text-gray-400" }, user.joined),
+                      React.createElement(TableCell, { className: "text-sm" }, user.bids),
+
+                      // Actions
+                      React.createElement(
+                        TableCell,
+                        { className: "text-right" },
+                        React.createElement(
+                          DropdownMenu,
+                          null,
+                          React.createElement(
+                            DropdownMenuTrigger,
+                            { asChild: true },
                             React.createElement(
-                              DropdownMenu,
-                              null,
-                              React.createElement(
-                                DropdownMenuTrigger,
-                                { asChild: true },
-                                React.createElement(
-                                  Button,
-                                  { variant: "ghost", size: "icon", disabled: isReadOnly },
-                                  React.createElement(MoreVertical, { className: "h-4 w-4" })
-                                )
-                              ),
-                              React.createElement(
-                                DropdownMenuContent,
-                                { align: "end" },
-                                React.createElement(
-                                  DropdownMenuItem,
-                                  { onClick: () => { setSelectedUser(user); setIsEditModalOpen(true); } },
-                                  React.createElement(Eye, { className: "mr-2 h-4 w-4" }), "View Profile"
-                                ),
-                                (user.roleValue && user.roleValue.toLowerCase() === 'seller_products') && React.createElement(
-                                  DropdownMenuItem,
-                                  { onClick: () => { window.location.hash = `seller-earnings?sellerId=${user.id}`; } },
-                                  React.createElement(DollarSign, { className: "mr-2 h-4 w-4" }), "View Earnings"
-                                ),
-                                React.createElement(
-                                  DropdownMenuItem,
-                                  { onClick: () => { 
-                                    setSelectedUser(user); 
-                                    setEditFormData({
-                                      name: user.name || '',
-                                      email: user.email || '',
-                                      phone: user.phone || '',
-                                      role: user.roleValue || user.role || '',
-                                      status: user.status?.toLowerCase() || 'active'
-                                    });
-                                    setIsEditModalOpen(true); 
-                                  } },
-                                  React.createElement(Edit, { className: "mr-2 h-4 w-4" }), "Edit User"
-                                ),
-                                !isReadOnly && (user.roleValue !== 'seller_products' && user.role?.toLowerCase() !== 'seller') && React.createElement(
-                                  DropdownMenuItem,
-                                  { onClick: () => handleChangeRoleClick(user) },
-                                  React.createElement(Shield, { className: "mr-2 h-4 w-4" }), "Change Role"
-                                ),
+                              Button,
+                              { variant: "ghost", size: "icon", disabled: isReadOnly },
+                              React.createElement(MoreVertical, { className: "h-4 w-4" })
+                            )
+                          ),
+                          React.createElement(
+                            DropdownMenuContent,
+                            { align: "end" },
+                            React.createElement(
+                              DropdownMenuItem,
+                              { onClick: () => { setSelectedUser(user); setIsEditModalOpen(true); } },
+                              React.createElement(Eye, { className: "mr-2 h-4 w-4" }), "View Profile"
+                            ),
+                            (user.roleValue && user.roleValue.toLowerCase() === 'seller_products') && React.createElement(
+                              DropdownMenuItem,
+                              { onClick: () => { window.location.hash = `seller-earnings?sellerId=${user.id}`; } },
+                              React.createElement(DollarSign, { className: "mr-2 h-4 w-4" }), "View Earnings"
+                            ),
+                            React.createElement(
+                              DropdownMenuItem,
+                              {
+                                onClick: () => {
+                                  setSelectedUser(user);
+                                  setEditFormData({
+                                    name: user.name || '',
+                                    email: user.email || '',
+                                    phone: user.phone || '',
+                                    role: user.roleValue || user.role || '',
+                                    status: user.status?.toLowerCase() || 'active'
+                                  });
+                                  setIsEditModalOpen(true);
+                                }
+                              },
+                              React.createElement(Edit, { className: "mr-2 h-4 w-4" }), "Edit User"
+                            ),
+                            !isReadOnly && (user.roleValue !== 'seller_products' && user.role?.toLowerCase() !== 'seller') && React.createElement(
+                              DropdownMenuItem,
+                              { onClick: () => handleChangeRoleClick(user) },
+                              React.createElement(Shield, { className: "mr-2 h-4 w-4" }), "Change Role"
+                            ),
 
-                                (user.status === 'Active' || user.status === 'Approved')
-                                  ? React.createElement(
-                                      DropdownMenuItem,
-                                      { className: "text-red-600", onClick: () => handleBlock(user.id) },
-                                      React.createElement(UserX, { className: "mr-2 h-4 w-4" }), "Suspend User"
-                                    )
-                                  : React.createElement(
-                                      DropdownMenuItem,
-                                      { className: "text-green-600", onClick: () => handleApprove(user.id) },
-                                      React.createElement(UserCheck, { className: "mr-2 h-4 w-4" }), "Activate User"
-                                    ),
-
-                                canDelete && React.createElement(
-                                  DropdownMenuItem,
-                                  { className: "text-red-600", onClick: () => handleDelete(user.id) },
-                                  React.createElement(UserX, { className: "mr-2 h-4 w-4" }), "Delete User"
-                                )
+                            (user.status === 'Active' || user.status === 'Approved')
+                              ? React.createElement(
+                                DropdownMenuItem,
+                                { className: "text-red-600", onClick: () => handleBlock(user.id) },
+                                React.createElement(UserX, { className: "mr-2 h-4 w-4" }), "Suspend User"
                               )
+                              : React.createElement(
+                                DropdownMenuItem,
+                                { className: "text-green-600", onClick: () => handleApprove(user.id) },
+                                React.createElement(UserCheck, { className: "mr-2 h-4 w-4" }), "Activate User"
+                              ),
+
+                            canDelete && React.createElement(
+                              DropdownMenuItem,
+                              { className: "text-red-600", onClick: () => handleDelete(user.id) },
+                              React.createElement(UserX, { className: "mr-2 h-4 w-4" }), "Delete User"
                             )
                           )
                         )
                       )
-                    : React.createElement(
-                        TableRow,
-                        null,
-                        React.createElement(
-                          TableCell,
-                          { colSpan: 6, className: "text-center py-8 text-gray-500" },
-                          "No users found"
-                        )
-                      )
-                )
+                    )
+                  )
+                  : React.createElement(
+                    TableRow,
+                    null,
+                    React.createElement(
+                      TableCell,
+                      { colSpan: 6, className: "text-center py-8 text-gray-500" },
+                      "No users found"
+                    )
+                  )
               )
             )
+          )
       )
     ),
 
@@ -715,7 +717,7 @@ export function UserManagementPage({ userRole }) {
           React.createElement(
             "div",
             { className: "space-y-4" },
-            
+
             // Name Field
             React.createElement(
               "div",
@@ -751,37 +753,37 @@ export function UserManagementPage({ userRole }) {
                 value: editFormData.phone,
                 onChange: (e) => setEditFormData({ ...editFormData, phone: e.target.value }),
                 placeholder: "+964 750 123 4567",
-                disabled: selectedUser?.roleValue?.toLowerCase() === 'superadmin' || 
-                         selectedUser?.roleValue?.toLowerCase() === 'admin' || 
-                         selectedUser?.roleValue?.toLowerCase() === 'moderator' ||
-                         selectedUser?.role?.toLowerCase() === 'super admin' ||
-                         selectedUser?.role?.toLowerCase() === 'moderator'
+                disabled: selectedUser?.roleValue?.toLowerCase() === 'superadmin' ||
+                  selectedUser?.roleValue?.toLowerCase() === 'admin' ||
+                  selectedUser?.roleValue?.toLowerCase() === 'moderator' ||
+                  selectedUser?.role?.toLowerCase() === 'super admin' ||
+                  selectedUser?.role?.toLowerCase() === 'moderator'
               }),
-              (selectedUser?.roleValue?.toLowerCase() === 'superadmin' || 
-               selectedUser?.roleValue?.toLowerCase() === 'admin' || 
-               selectedUser?.roleValue?.toLowerCase() === 'moderator' ||
-               selectedUser?.role?.toLowerCase() === 'super admin' ||
-               selectedUser?.role?.toLowerCase() === 'moderator') && React.createElement(
-                "p",
-                { className: "text-xs text-amber-600 dark:text-amber-400 mt-1" },
-                "⚠️ Phone number is fixed for Super Admin/Moderator for login security"
-              )
+              (selectedUser?.roleValue?.toLowerCase() === 'superadmin' ||
+                selectedUser?.roleValue?.toLowerCase() === 'admin' ||
+                selectedUser?.roleValue?.toLowerCase() === 'moderator' ||
+                selectedUser?.role?.toLowerCase() === 'super admin' ||
+                selectedUser?.role?.toLowerCase() === 'moderator') && React.createElement(
+                  "p",
+                  { className: "text-xs text-amber-600 dark:text-amber-400 mt-1" },
+                  "⚠️ Phone number is fixed for Super Admin/Moderator for login security"
+                )
             ),
 
             // Role and Status Grid
             React.createElement(
               "div",
-              { className: "grid grid-cols-2 gap-4" },
+              { className: "grid grid-cols-1 sm:grid-cols-2 gap-4" },
               React.createElement(
                 "div",
                 { className: "space-y-2" },
                 React.createElement(Label, null, "Role"),
-                  React.createElement(
-                    Select,
-                    { 
-                      value: editFormData.role,
-                      onValueChange: (value) => setEditFormData({ ...editFormData, role: value })
-                    },
+                React.createElement(
+                  Select,
+                  {
+                    value: editFormData.role,
+                    onValueChange: (value) => setEditFormData({ ...editFormData, role: value })
+                  },
                   React.createElement(SelectTrigger, null,
                     React.createElement(SelectValue, null)
                   ),
@@ -804,7 +806,7 @@ export function UserManagementPage({ userRole }) {
                 React.createElement(Label, null, "Status"),
                 React.createElement(
                   Select,
-                  { 
+                  {
                     value: editFormData.status,
                     onValueChange: (value) => setEditFormData({ ...editFormData, status: value })
                   },
@@ -826,7 +828,7 @@ export function UserManagementPage({ userRole }) {
 
           React.createElement(
             "div",
-            { className: "grid grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg" },
+            { className: "grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg" },
             React.createElement(
               "div",
               null,
@@ -847,8 +849,8 @@ export function UserManagementPage({ userRole }) {
             null,
             React.createElement(
               Button,
-              { 
-                variant: "outline", 
+              {
+                variant: "outline",
                 onClick: () => {
                   setIsEditModalOpen(false);
                   setEditFormData({ name: '', email: '', phone: '', role: '', status: '' });
@@ -858,8 +860,8 @@ export function UserManagementPage({ userRole }) {
               "Cancel"
             ),
             React.createElement(
-              Button, 
-              { 
+              Button,
+              {
                 onClick: async () => {
                   if (!selectedUser || isReadOnly) {
                     toast.error('You do not have permission');
@@ -868,17 +870,17 @@ export function UserManagementPage({ userRole }) {
 
                   try {
                     setIsSaving(true);
-                    
+
                     // CRITICAL: Block phone number update for Super Admin/Moderator
                     const userRole = selectedUser.roleValue?.toLowerCase() || selectedUser.role?.toLowerCase() || '';
                     const isProtectedRole = userRole === 'superadmin' || userRole === 'admin' || userRole === 'moderator' || userRole === 'super admin';
-                    
+
                     if (isProtectedRole && editFormData.phone !== undefined && editFormData.phone !== selectedUser.phone) {
                       toast.error('Cannot update phone number for Super Admin or Moderator. Phone number is fixed for login security.');
                       setIsSaving(false);
                       return;
                     }
-                    
+
                     const updateData = {};
                     if (editFormData.name) updateData.name = editFormData.name;
                     if (editFormData.email) updateData.email = editFormData.email;
@@ -889,7 +891,7 @@ export function UserManagementPage({ userRole }) {
                     if (editFormData.status) updateData.status = editFormData.status === 'active' ? 'approved' : editFormData.status;
 
                     const response = await apiService.updateUser(selectedUser.id, updateData);
-                    
+
                     if (response?.message || response?.user) {
                       toast.success(response.message || 'User updated successfully');
                       setIsEditModalOpen(false);
@@ -922,7 +924,7 @@ export function UserManagementPage({ userRole }) {
       { open: isRoleChangeModalOpen, onOpenChange: setIsRoleChangeModalOpen },
       React.createElement(
         DialogContent,
-        null,
+        { className: "w-[95vw] sm:w-full max-w-lg" },
         React.createElement(DialogHeader, null,
           React.createElement(DialogTitle, null, "Change User Role"),
           React.createElement(DialogDescription, null, "Update the role for this user")
@@ -958,9 +960,9 @@ export function UserManagementPage({ userRole }) {
             React.createElement(Label, null, "New Role"),
             React.createElement(
               Select,
-              { 
-                value: selectedRoleForChange, 
-                onValueChange: setSelectedRoleForChange 
+              {
+                value: selectedRoleForChange,
+                onValueChange: setSelectedRoleForChange
               },
               React.createElement(SelectTrigger, null,
                 React.createElement(SelectValue, { placeholder: "Select a role" })
@@ -983,8 +985,8 @@ export function UserManagementPage({ userRole }) {
             null,
             React.createElement(
               Button,
-              { 
-                variant: "outline", 
+              {
+                variant: "outline",
                 onClick: () => {
                   setIsRoleChangeModalOpen(false);
                   setSelectedUser(null);
@@ -995,8 +997,8 @@ export function UserManagementPage({ userRole }) {
               "Cancel"
             ),
             React.createElement(
-              Button, 
-              { 
+              Button,
+              {
                 onClick: handleSaveRoleChange,
                 disabled: isChangingRole || !selectedRoleForChange
               },

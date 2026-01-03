@@ -75,7 +75,7 @@ export function ProductManagementPage({ userRole }) {
   const isReadOnly = userRole === 'viewer';
   const canDelete = userRole === 'superadmin' || userRole === 'super-admin';
   const canCreate = userRole === 'superadmin' || userRole === 'super-admin' || userRole === 'moderator' || userRole === 'employee';
-  
+
   // Debug: Log role information
   console.log('[ProductManagement] User Role:', userRole);
   console.log('[ProductManagement] Can Delete:', canDelete);
@@ -120,11 +120,11 @@ export function ProductManagementPage({ userRole }) {
     try {
       // Upload all files at once using uploadImages (faster - single API call)
       const uploadResult = await apiService.uploadImages(files);
-      
+
       // Extract URLs from upload results
       const uploadedImages = uploadResult.data || uploadResult || [];
       const uploadedUrls = uploadedImages.map(img => img.url || img.data?.url).filter(url => url);
-      
+
       if (uploadedUrls.length === 0) {
         toast.error('Failed to upload images. Please try again.');
         return;
@@ -137,7 +137,7 @@ export function ProductManagementPage({ userRole }) {
         images: uploadedUrls
       }));
       setUploadedFiles(uploadedUrls);
-      
+
       toast.success(`${uploadedUrls.length} image(s) uploaded successfully!`);
     } catch (error) {
       console.error('Error uploading images:', error);
@@ -181,7 +181,7 @@ export function ProductManagementPage({ userRole }) {
         image_url: createFormData.image_url || null,
         images: createFormData.images.length > 0 ? createFormData.images : (createFormData.image_url ? [createFormData.image_url] : [])
       });
-      
+
       // Close modal immediately and reset form (don't wait for loadProducts)
       setIsCreateModalOpen(false);
       setCreateFormData({
@@ -194,9 +194,9 @@ export function ProductManagementPage({ userRole }) {
         images: []
       });
       setUploadedFiles([]);
-      
+
       toast.success('Company product created successfully! It is now pending approval.');
-      
+
       // Refresh products in background (don't block UI)
       loadProducts().catch(err => {
         console.error('Error refreshing products:', err);
@@ -260,7 +260,7 @@ export function ProductManagementPage({ userRole }) {
       await apiService.approveProduct(id);
       toast.success('Product approved');
       setIsProductModalOpen(false);
-      
+
       // Refresh only the active tab
       if (activeTab === 'pending') {
         await reloadPending();
@@ -279,17 +279,17 @@ export function ProductManagementPage({ userRole }) {
       setIsEditMode(!isEditMode);
       if (!isEditMode) {
         // Initialize form data when entering edit mode
-        const imageUrl = Array.isArray(selectedProduct.image_url) 
-          ? selectedProduct.image_url[0] || selectedProduct.image_url 
+        const imageUrl = Array.isArray(selectedProduct.image_url)
+          ? selectedProduct.image_url[0] || selectedProduct.image_url
           : selectedProduct.image_url || selectedProduct.image || '';
-        
+
         setEditFormData({
           title: selectedProduct.title || selectedProduct.name || '',
           description: selectedProduct.description || selectedProduct.desc || '',
           starting_bid: selectedProduct.starting_bid || selectedProduct.startingBid || selectedProduct.price || '',
           image_url: imageUrl
         });
-        
+
         console.log('[Edit] Form initialized with:', {
           title: selectedProduct.title || selectedProduct.name || '',
           description: selectedProduct.description || selectedProduct.desc || '',
@@ -310,25 +310,25 @@ export function ProductManagementPage({ userRole }) {
 
   const handleUpdateProduct = async () => {
     if (!selectedProduct?.id) return;
-    
+
     setIsUpdating(true);
     try {
       console.log('[Update] Updating product:', selectedProduct.id);
       console.log('[Update] Form data:', editFormData);
-      
+
       const updateData = {
         title: editFormData.title,
         description: editFormData.description,
         startingPrice: parseFloat(editFormData.starting_bid) || 0,
         image_url: editFormData.image_url
       };
-      
+
       const response = await apiService.updateProduct(selectedProduct.id, updateData);
       console.log('[Update] Product updated successfully:', response);
-      
+
       toast.success('Product updated successfully');
       setIsEditMode(false);
-      
+
       // Refresh the active tab
       if (activeTab === 'pending') {
         await reloadPending();
@@ -339,12 +339,12 @@ export function ProductManagementPage({ userRole }) {
       } else if (activeTab === 'rejected') {
         await reloadRejected();
       }
-      
+
       // Reload the product data
       const updatedProduct = await apiService.getProductById(selectedProduct.id);
       const productData = updatedProduct?.data || updatedProduct?.product || updatedProduct;
       setSelectedProduct(productData);
-      
+
     } catch (error) {
       console.error('[Update] Error updating product:', error);
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to update product';
@@ -360,7 +360,7 @@ export function ProductManagementPage({ userRole }) {
       await apiService.rejectProduct(id, { reason: 'Rejected by admin' });
       toast.success('Product rejected');
       setIsProductModalOpen(false);
-      
+
       // Refresh only the active tab
       if (activeTab === 'pending') {
         await reloadPending();
@@ -413,7 +413,7 @@ export function ProductManagementPage({ userRole }) {
       console.error('[Delete] No product ID selected');
       return;
     }
-    
+
     console.log('[Delete] Confirming deletion for product:', selectedProductId);
     setIsDeleting(true);
     try {
@@ -424,7 +424,7 @@ export function ProductManagementPage({ userRole }) {
       setShowDeleteModal(false);
       setSelectedProductId(null);
       setSelectedProductName(null);
-      
+
       // Refresh only the active tab
       console.log('[Delete] Refreshing active tab:', activeTab);
       if (activeTab === 'pending') {
@@ -436,14 +436,14 @@ export function ProductManagementPage({ userRole }) {
       } else if (activeTab === 'rejected') {
         await reloadRejected();
       }
-      
+
       setIsProductModalOpen(false);
     } catch (error) {
       console.error("[Delete] Error deleting product:", error);
       console.error("[Delete] Error response:", error.response);
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to delete product';
-      toast.error('Failed to delete product', { 
-        description: errorMessage 
+      toast.error('Failed to delete product', {
+        description: errorMessage
       });
     } finally {
       setIsDeleting(false);
@@ -452,7 +452,7 @@ export function ProductManagementPage({ userRole }) {
 
   const formatTimeAgo = (date) => {
     if (!date) return 'Just now';
-    
+
     try {
       const now = new Date();
       // Handle both string and Date object
@@ -466,16 +466,16 @@ export function ProductManagementPage({ userRole }) {
       } else {
         past = new Date(date);
       }
-      
+
       // Check if date is valid
       if (isNaN(past.getTime())) {
         console.warn('Invalid date:', date);
         return 'Just now';
       }
-      
+
       const diff = now.getTime() - past.getTime();
       const mins = diff / 60000;
-      
+
       // If negative (future date) or less than 1 minute, return "Just now"
       if (diff < 0 || mins < 1) return 'Just now';
       if (mins < 60) return `${Math.floor(mins)} min ago`;
@@ -539,11 +539,7 @@ export function ProductManagementPage({ userRole }) {
         }
       }}>
         <DialogContent
-          className="max-w-[400px] w-[calc(100%-1rem)] sm:w-[90vw] md:w-[450px] lg:w-[600px]
-                     max-h-[90vh] sm:max-h-[85vh] md:max-h-[80vh]
-                     p-3 sm:p-4 md:p-6
-                     flex flex-col overflow-y-auto
-                     mx-auto"
+          className="w-[95vw] sm:w-full max-w-lg max-h-[90vh] overflow-y-auto mx-auto"
         >
           <DialogHeader className="flex-shrink-0 pb-1 sm:pb-1.5">
             <div className="flex items-start justify-between gap-1.5 sm:gap-2">
@@ -582,7 +578,7 @@ export function ProductManagementPage({ userRole }) {
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Editable Fields */}
                   <div className="space-y-4">
                     {/* Product Name */}
@@ -601,7 +597,7 @@ export function ProductManagementPage({ userRole }) {
                         <p className="text-xs text-red-500 mt-1.5">⚠️ Product name is required</p>
                       )}
                     </div>
-                    
+
                     {/* Description */}
                     <div>
                       <Label htmlFor="edit-description" className="text-sm font-semibold mb-2 block text-gray-900 dark:text-white">
@@ -617,7 +613,7 @@ export function ProductManagementPage({ userRole }) {
                       />
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">💡 Tip: Add detailed information to help buyers make informed decisions</p>
                     </div>
-                    
+
                     {/* Starting Bid */}
                     <div>
                       <Label htmlFor="edit-starting-bid" className="text-sm font-semibold mb-2 block text-gray-900 dark:text-white">
@@ -644,7 +640,7 @@ export function ProductManagementPage({ userRole }) {
                       )}
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">💰 This is the minimum bid amount for the auction</p>
                     </div>
-                    
+
                     {/* Image URL */}
                     <div>
                       <Label htmlFor="edit-image-url" className="text-sm font-semibold mb-2 block text-gray-900 dark:text-white">
@@ -660,7 +656,7 @@ export function ProductManagementPage({ userRole }) {
                       />
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">📷 Enter a valid image URL (optional)</p>
                     </div>
-                    
+
                     {/* Image Preview */}
                     {editFormData.image_url && (
                       <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
@@ -685,7 +681,7 @@ export function ProductManagementPage({ userRole }) {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Read-Only Information Section */}
                   <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                     <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-3 flex items-center gap-2">
@@ -846,28 +842,30 @@ export function ProductManagementPage({ userRole }) {
                       <XCircle className="h-4 w-4 mr-2" />
                       Reject
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="text-orange-600 w-full sm:w-auto"
                       disabled={isReadOnly}
                     >
                       <Flag className="h-4 w-4 mr-2" />
                       Flag for Review
                     </Button>
-                    <Button
-                      className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
-                      disabled={isReadOnly}
-                      onClick={() => {
-                        if (selectedProduct.id) {
-                          handleApprove(selectedProduct.id);
-                        } else {
-                          setIsProductModalOpen(false);
-                        }
-                      }}
-                    >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Approve
-                    </Button>
+                    {selectedProduct.status !== 'approved' && (
+                      <Button
+                        className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
+                        disabled={isReadOnly}
+                        onClick={() => {
+                          if (selectedProduct.id) {
+                            handleApprove(selectedProduct.id);
+                          } else {
+                            setIsProductModalOpen(false);
+                          }
+                        }}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Approve
+                      </Button>
+                    )}
                   </>
                 )}
               </Fragment>
@@ -1079,11 +1077,11 @@ export function ProductManagementPage({ userRole }) {
                                       console.log('[Edit] Fetching product data from API...');
                                       const response = await apiService.getProductById(product.id);
                                       console.log('[Edit] API response:', response);
-                                      
+
                                       // Handle different response structures
                                       const productData = response?.product || response?.data || response;
                                       console.log('[Edit] Extracted product data:', productData);
-                                      
+
                                       if (productData && (productData.id || productData.title || productData.name)) {
                                         setSelectedProduct(productData);
                                         setIsProductModalOpen(true);
@@ -1192,8 +1190,8 @@ export function ProductManagementPage({ userRole }) {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         className="flex-1 min-w-[120px]"
                         onClick={async () => {
                           try {
@@ -1278,8 +1276,8 @@ export function ProductManagementPage({ userRole }) {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         className="flex-1 min-w-[100px]"
                         onClick={async () => {
                           try {
@@ -1296,7 +1294,7 @@ export function ProductManagementPage({ userRole }) {
                         <span className="hidden sm:inline">View Details</span>
                         <span className="sm:hidden">View</span>
                       </Button>
-                      <Button 
+                      <Button
                         variant="default"
                         className="bg-blue-600 hover:bg-blue-700 flex-1 min-w-[100px]"
                         onClick={(e) => {
@@ -1555,7 +1553,7 @@ export function ProductManagementPage({ userRole }) {
 
       {/* Create Product Modal */}
       <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-        <DialogContent className="max-w-2xl w-[95vw] sm:w-full p-0 flex flex-col max-h-[90vh]">
+        <DialogContent className="p-0 gap-0 w-screen h-[100dvh] max-w-none rounded-none border-0 sm:w-full sm:max-w-xl sm:h-auto sm:max-h-[85vh] sm:rounded-lg sm:border flex flex-col bg-white dark:bg-gray-900 mx-auto">
           <DialogHeader className="px-4 sm:px-6 pt-3 sm:pt-4 pb-2 sm:pb-3 flex-shrink-0 border-b">
             <DialogTitle className="text-base sm:text-lg">Add Company Product</DialogTitle>
             <DialogDescription className="text-xs sm:text-sm">
@@ -1563,7 +1561,7 @@ export function ProductManagementPage({ userRole }) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 px-4 sm:px-6 py-4 overflow-y-auto flex-1 min-h-0" style={{ maxHeight: 'calc(90vh - 140px)' }}>
+          <div className="space-y-4 px-4 sm:px-6 py-4 overflow-y-auto flex-1 h-full sm:h-auto">
             {/* Row 1: Title and Category */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Title */}
@@ -1576,7 +1574,7 @@ export function ProductManagementPage({ userRole }) {
                   value={createFormData.title}
                   onChange={(e) => setCreateFormData({ ...createFormData, title: e.target.value })}
                   placeholder="e.g., Apple iPhone 15 Pro Max"
-                  className="w-full"
+                  className="w-full text-base sm:text-sm"
                 />
               </div>
 
@@ -1589,7 +1587,7 @@ export function ProductManagementPage({ userRole }) {
                   id="create-category"
                   value={createFormData.category_id}
                   onChange={(e) => setCreateFormData({ ...createFormData, category_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
                 >
                   <option value="">Select Category</option>
                   {categories.map((cat) => (
@@ -1611,7 +1609,7 @@ export function ProductManagementPage({ userRole }) {
                 value={createFormData.description}
                 onChange={(e) => setCreateFormData({ ...createFormData, description: e.target.value })}
                 placeholder="Describe the product features, condition, specifications..."
-                className="w-full min-h-[90px] resize-none"
+                className="w-full min-h-[90px] resize-none text-base sm:text-sm"
                 rows={3}
               />
             </div>
@@ -1630,7 +1628,7 @@ export function ProductManagementPage({ userRole }) {
                   value={createFormData.startingPrice}
                   onChange={(e) => setCreateFormData({ ...createFormData, startingPrice: e.target.value })}
                   placeholder="0.00"
-                  className="w-full"
+                  className="w-full text-base sm:text-sm"
                 />
               </div>
 
@@ -1643,7 +1641,7 @@ export function ProductManagementPage({ userRole }) {
                   id="create-duration"
                   value={createFormData.duration}
                   onChange={(e) => setCreateFormData({ ...createFormData, duration: parseInt(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
                 >
                   <option value={1}>1 Day</option>
                   <option value={2}>2 Days</option>
@@ -1663,11 +1661,10 @@ export function ProductManagementPage({ userRole }) {
                   htmlFor="create-image-upload"
                   className="flex-1 cursor-pointer block"
                 >
-                  <div className={`flex items-center justify-center w-full h-24 border-2 border-dashed rounded-lg transition-colors ${
-                    isUploading 
-                      ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20' 
-                      : 'border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-400 bg-gray-50 dark:bg-gray-900'
-                  }`}>
+                  <div className={`flex items-center justify-center w-full h-24 border-2 border-dashed rounded-lg transition-colors ${isUploading
+                    ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20'
+                    : 'border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-400 bg-gray-50 dark:bg-gray-900'
+                    }`}>
                     {isUploading ? (
                       <div className="flex flex-col items-center gap-2">
                         <div className="animate-spin rounded-full h-7 w-7 border-2 border-blue-600 border-t-transparent"></div>
@@ -1711,7 +1708,7 @@ export function ProductManagementPage({ userRole }) {
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Show uploaded images */}
                     {createFormData.images.map((url, index) => (
                       <div key={index} className="relative group flex-shrink-0">
@@ -1748,8 +1745,8 @@ export function ProductManagementPage({ userRole }) {
             </div>
           </div>
 
-          <DialogFooter className="px-4 sm:px-6 pb-4 pt-3 border-t bg-background flex-shrink-0 sticky bottom-0 z-10">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 w-full">
+          <DialogFooter className="p-4 sm:px-6 sm:py-4 border-t bg-background flex-shrink-0 sticky bottom-0 z-10 sm:static">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 w-full">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -1773,11 +1770,11 @@ export function ProductManagementPage({ userRole }) {
               <Button
                 onClick={handleCreateProduct}
                 disabled={
-                  isCreating || 
-                  isUploading || 
-                  !createFormData.title || 
-                  !createFormData.startingPrice || 
-                  !createFormData.category_id || 
+                  isCreating ||
+                  isUploading ||
+                  !createFormData.title ||
+                  !createFormData.startingPrice ||
+                  !createFormData.category_id ||
                   (createFormData.images.length === 0 && !createFormData.image_url)
                 }
                 className="w-full sm:w-auto min-w-[140px] bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed relative"

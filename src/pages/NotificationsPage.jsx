@@ -8,6 +8,7 @@ import { Separator } from '../components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { apiService as api } from '../services/api';
+import { format, formatDistanceToNow } from 'date-fns';
 
 export function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
@@ -47,16 +48,47 @@ export function NotificationsPage() {
       const response = await api.getNotifications(params);
 
       // Transform backend data to match frontend format
-      const transformedNotifications = (response.data || []).map(notif => ({
-        id: notif.id,
-        type: notif.type || 'system',
-        title: notif.title || 'Notification',
-        message: notif.message || notif.body || '',
-        time: formatTimeAgo(new Date(notif.created_at || notif.createdAt)),
-        read: notif.is_read || notif.isRead || false,
-        user_name: notif.user_name,
-        user_email: notif.user_email,
-      }));
+      const transformedNotifications = (response.data || []).map(notif => {
+        const dateStr = notif.created_at || notif.createdAt;
+        let date = new Date(dateStr);
+
+        // LOCALHOST FIX:
+        // Identify if we are running locally. The local DB driver seems to shift UTC to Local.
+        // E.g. 01:00 UTC -> 01:00 Local -> Sent as 20:00 UTC (prev day).
+        // Frontend sees 20:00 UTC -> 01:00 Local (5 hours ago).
+        // We need to shift it FORWARD by the timezone offset to get back to 06:00 Local.
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+        if (isLocalhost && isValidDate(date)) {
+          // Get timezone offset in minutes (e.g., -300 for PKT)
+          const offset = date.getTimezoneOffset();
+          // We want to ADD 5 hours. offset is -300. So we subtract the negative offset.
+          // date.getTime() - (-300 * 60000) = date + 18000000ms (5 hours).
+          date = new Date(date.getTime() - (offset * 60000));
+        }
+
+        const isValid = isValidDate(date);
+        let timeDisplay = 'Invalid Date';
+
+        if (isValid) {
+          // Match Live style: "about 6 hours ago" or "40 min ago"
+          // Using formatDistanceToNow provides "X minutes ago"
+          // To get exactly "min ago" we'd need custom locale or string replace, 
+          // but "minutes ago" is cleaner and standard.
+          timeDisplay = formatDistanceToNow(date, { addSuffix: true });
+        }
+
+        return {
+          id: notif.id,
+          type: notif.type || 'system',
+          title: notif.title || 'Notification',
+          message: notif.message || notif.body || '',
+          time: timeDisplay,
+          read: notif.is_read || notif.isRead || false,
+          user_name: notif.user_name,
+          user_email: notif.user_email,
+        };
+      });
 
       setNotifications(transformedNotifications);
     } catch (err) {
@@ -67,18 +99,9 @@ export function NotificationsPage() {
     }
   };
 
-  const formatTimeAgo = (date) => {
-    const now = new Date();
-    const diff = now - date;
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes} min ago`;
-    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-    if (days < 7) return `${days} day${days > 1 ? 's' : ''} ago`;
-    return date.toLocaleDateString();
+  // Helper to check for valid date
+  const isValidDate = (d) => {
+    return d instanceof Date && !isNaN(d);
   };
 
   const loadSettings = async () => {

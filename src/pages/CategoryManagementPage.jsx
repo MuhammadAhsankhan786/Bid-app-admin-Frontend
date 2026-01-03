@@ -204,7 +204,7 @@ export function CategoryManagementPage() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:w-full max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingCategory ? 'Edit Category' : 'Create Category'}

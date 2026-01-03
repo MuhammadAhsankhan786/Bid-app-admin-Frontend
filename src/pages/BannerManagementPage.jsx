@@ -29,10 +29,10 @@ export function BannerManagementPage() {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBanner, setEditingBanner] = useState(null);
-  const [formData, setFormData] = useState({ 
-    title: '', 
-    link: '', 
-    displayOrder: 0, 
+  const [formData, setFormData] = useState({
+    title: '',
+    link: '',
+    displayOrder: 0,
     isActive: true,
     imageUrl: '',
     imageFile: null
@@ -56,7 +56,7 @@ export function BannerManagementPage() {
     } catch (error) {
       console.error('Error loading banners:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to load banners';
-      
+
       // Don't show error toast if it's just 404 (no banners yet) or network error
       if (error.response?.status === 404) {
         console.log('No banners found (404) - this is normal if no banners are created yet');
@@ -74,10 +74,10 @@ export function BannerManagementPage() {
 
   const handleCreate = () => {
     setEditingBanner(null);
-    setFormData({ 
-      title: '', 
-      link: '', 
-      displayOrder: 0, 
+    setFormData({
+      title: '',
+      link: '',
+      displayOrder: 0,
       isActive: true,
       imageUrl: '',
       imageFile: null
@@ -135,7 +135,7 @@ export function BannerManagementPage() {
 
     try {
       const formDataToSend = new FormData();
-      
+
       if (formData.imageFile) {
         formDataToSend.append('image', formData.imageFile);
       } else if (formData.imageUrl && !editingBanner) {
@@ -241,9 +241,9 @@ export function BannerManagementPage() {
                   <TableRow key={banner.id}>
                     <TableCell>
                       {banner.imageUrl ? (
-                        <img 
-                          src={banner.imageUrl} 
-                          alt={banner.title || 'Banner'} 
+                        <img
+                          src={banner.imageUrl}
+                          alt={banner.title || 'Banner'}
                           className="w-20 h-12 object-cover rounded"
                           onError={(e) => {
                             e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="80" height="48"%3E%3Crect fill="%23ddd" width="80" height="48"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999"%3ENo Image%3C/text%3E%3C/svg%3E';
@@ -258,9 +258,9 @@ export function BannerManagementPage() {
                     <TableCell className="font-medium">{banner.title || 'Untitled'}</TableCell>
                     <TableCell>
                       {banner.link ? (
-                        <a 
-                          href={banner.link} 
-                          target="_blank" 
+                        <a
+                          href={banner.link}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="text-blue-600 hover:underline flex items-center gap-1"
                         >
@@ -308,7 +308,7 @@ export function BannerManagementPage() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="w-[95vw] sm:w-full max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingBanner ? 'Edit Banner' : 'Create Banner'}
@@ -317,7 +317,7 @@ export function BannerManagementPage() {
               {editingBanner ? 'Update banner information' : 'Add a new banner to the carousel'}
             </DialogDescription>
           </DialogHeader>
-          
+
           {/* Content Area */}
           <div className="space-y-4">
             {/* Banner Size Requirements */}
@@ -329,8 +329,8 @@ export function BannerManagementPage() {
                     Recommended Banner Size for Flutter App:
                   </p>
                   <p className="text-xs text-blue-700 dark:text-blue-300">
-                    <strong>1920 x 600 pixels</strong> (16:5 ratio)<br/>
-                    Max file size: 5MB<br/>
+                    <strong>1920 x 600 pixels</strong> (16:5 ratio)<br />
+                    Max file size: 5MB<br />
                     Formats: JPG, PNG, WebP
                   </p>
                 </div>
@@ -376,9 +376,9 @@ export function BannerManagementPage() {
                 <Label className="text-sm font-medium">Preview</Label>
                 <div className="mt-2 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-900 p-2">
                   <div className="relative w-full" style={{ aspectRatio: '16/5', minHeight: '120px', maxHeight: '200px' }}>
-                    <img 
-                      src={imagePreview} 
-                      alt="Banner Preview" 
+                    <img
+                      src={imagePreview}
+                      alt="Banner Preview"
                       className="w-full h-full object-contain"
                       onError={(e) => {
                         e.target.style.display = 'none';
