@@ -10,26 +10,87 @@ import React from 'react';
 
 /**
  * Get API Base URL based on environment
+ * Smart logic: Try local first, fallback to production if local fails
  */
-function getBaseUrl() {
+function getBaseUrl(forceProduction = false) {
+  // If forcing production (after local failed), return production URL
+  if (forceProduction) {
+    const productionUrl = 'https://api.mazaadati.com/api';
+    console.log('🌐 [LoginPage] Using PRODUCTION API (fallback):', productionUrl);
+    return productionUrl;
+  }
+
+  // Priority 1: Check if running on localhost (TRY local first)
+  const hostname = window.location.hostname;
+  const port = window.location.port;
+  const isLocalhost = hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '' ||
+    hostname.startsWith('192.168.') ||
+    hostname.startsWith('10.') ||
+    hostname.startsWith('172.');
+
+  // If on localhost, TRY local URL first (will fallback to production if fails)
+  if (isLocalhost) {
+    const localUrl = 'http://localhost:5000/api';
+    console.log('🌐 [LoginPage] Localhost detected - Will try LOCAL API first:', localUrl);
+    console.log('   💡 If local backend is not running, will auto-fallback to production');
+    return localUrl;
+  }
+
+  // Priority 2: Check localStorage for manual override (only for non-localhost)
+  const storedUrl = localStorage.getItem('API_BASE_URL');
+  if (storedUrl && storedUrl.trim() !== '') {
+    console.log('🌐 [LoginPage] Using API URL from localStorage:', storedUrl);
+    return storedUrl;
+  }
+
+  // Priority 3: Check environment variable
   const envUrl = import.meta.env.VITE_BASE_URL || import.meta.env.REACT_APP_BASE_URL;
-  if (envUrl) {
+  if (envUrl && envUrl.trim() !== '') {
+    console.log('🌐 [LoginPage] Using API URL from environment:', envUrl);
     return envUrl;
   }
 
-  const isDevelopment = import.meta.env.MODE === 'development' || 
-                        import.meta.env.DEV || 
-                        window.location.hostname === 'localhost' ||
-                        window.location.hostname === '127.0.0.1';
+  // Priority 4: Check if it's a production domain (not localhost)
+  // If hostname is not localhost and not a private IP, it's production
+  const isProductionDomain = 
+    hostname !== 'localhost' &&
+    hostname !== '127.0.0.1' &&
+    !hostname.startsWith('192.168.') &&
+    !hostname.startsWith('10.') &&
+    !hostname.startsWith('172.') &&
+    hostname !== '' &&
+    !hostname.includes('.local');
 
-  if (isDevelopment) {
-    return 'http://localhost:5000/api';
+  // If on production domain, use production API directly
+  if (isProductionDomain) {
+    const productionUrl = 'https://api.mazaadati.com/api';
+    console.log('🌐 [LoginPage] Production domain detected - Using PRODUCTION API:', productionUrl);
+    console.log('   Hostname:', hostname);
+    return productionUrl;
   }
 
-  return 'https://api.mazaadati.com/api';
+  // Priority 5: Check Vite development mode (only for localhost)
+  const isViteDev = import.meta.env.MODE === 'development' ||
+    import.meta.env.DEV ||
+    import.meta.env.PROD === false;
+
+  // Use local URL if in development mode (only on localhost)
+  if (isViteDev || port === '3000' || port === '5173') {
+    const localUrl = 'http://localhost:5000/api';
+    console.log('🌐 [LoginPage] Development mode - Will try LOCAL API first:', localUrl);
+    return localUrl;
+  }
+
+  // Fallback: Production API (when deployed to production domain)
+  const productionUrl = 'https://api.mazaadati.com/api';
+  console.log('🌐 [LoginPage] Fallback - Using PRODUCTION API:', productionUrl);
+  return productionUrl;
 }
 
-const BASE_URL = getBaseUrl();
+// Get initial base URL (will try local first if on localhost)
+let BASE_URL = getBaseUrl();
 
 /**
  * Normalize Iraq phone number
@@ -167,77 +228,76 @@ export function LoginPage({ onLogin }) {
     try {
       const normalizedPhone = normalizeIraqPhone(phone);
       
-      // Call POST /auth/admin-login with phone + role (NO OTP)
-      const response = await fetch(`${BASE_URL}/auth/admin-login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          phone: normalizedPhone,
-          role: selectedRole
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
-      }
-
-      if (data.success && data.token) {
-        // Extract role from response
-        const role = data.role || data.user?.role;
-        const normalizedRole = role?.toLowerCase();
-        
-        // Check if user has admin role (superadmin, admin, moderator, viewer, employee)
-        const adminRoles = ['superadmin', 'admin', 'moderator', 'viewer', 'employee'];
-        if (!normalizedRole || !adminRoles.includes(normalizedRole)) {
-          console.error('❌ [Admin Panel] Non-admin user attempted login. Role:', normalizedRole);
-          localStorage.removeItem('token');
-          throw new Error('Access denied. Admin panel is only for administrators. Your account role does not have admin access.');
+      // Smart fallback: Try local first, then production if local fails
+      let currentBaseUrl = BASE_URL;
+      let isLocalUrl = currentBaseUrl.includes('localhost') || currentBaseUrl.includes('127.0.0.1');
+      let triedProduction = false;
+      
+      // Try login with current URL (local or production)
+      while (true) {
+        console.log('🔐 [LoginPage] Attempting login to:', `${currentBaseUrl}/auth/admin-login`);
+        console.log('   Phone:', normalizedPhone, 'Role:', selectedRole);
+        if (triedProduction) {
+          console.log('   🔄 Retrying with PRODUCTION API (local backend not available)');
         }
         
-        // Verify token scope is "admin" before storing
-        const tokenScope = getScopeFromToken(data.token);
+        // Create AbortController for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout for faster fallback
         
-        // If scope is "mobile", reject login and clear any existing token
-        if (tokenScope === 'mobile') {
-          console.error('❌ [Admin Panel] Mobile-scope token received. Admin panel requires admin-scope token.');
-          localStorage.removeItem('token');
-          throw new Error('Invalid token scope. Admin panel requires admin login. Please use admin credentials.');
+        try {
+          const response = await fetch(`${currentBaseUrl}/auth/admin-login`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              phone: normalizedPhone,
+              role: selectedRole
+            }),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          
+          // Success! Process the response
+          await processLoginResponse(response);
+          return; // Exit successfully
+          
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          
+          // Check if it's a connection error
+          const isConnectionError = 
+            fetchError.name === 'AbortError' ||
+            (fetchError.message && (
+              fetchError.message.includes('Failed to fetch') ||
+              fetchError.message.includes('ERR_CONNECTION') ||
+              fetchError.message.includes('timeout') ||
+              fetchError.message.includes('NetworkError')
+            ));
+          
+          // If local backend failed and we haven't tried production yet, fallback to production
+          if (isConnectionError && isLocalUrl && !triedProduction) {
+            console.warn('⚠️ [LoginPage] Local backend not accessible, trying production API...');
+            const productionUrl = 'https://api.mazaadati.com/api';
+            currentBaseUrl = productionUrl;
+            isLocalUrl = false;
+            triedProduction = true;
+            // Save to localStorage so it persists on refresh
+            localStorage.setItem('API_BASE_URL', productionUrl);
+            console.log('✅ [LoginPage] Switched to PRODUCTION API and saved to localStorage');
+            continue; // Retry with production URL
+          }
+          
+          // If we already tried production or it's not a connection error, throw the error
+          if (fetchError.name === 'AbortError') {
+            throw new Error('Connection timeout. Please check your internet connection.');
+          }
+          if (isConnectionError) {
+            throw new Error(`Cannot connect to API server. ${triedProduction ? 'Both local and production servers are unreachable.' : 'Please check your internet connection.'}`);
+          }
+          throw fetchError;
         }
-        
-        // Only allow tokens with scope="admin" or no scope (backward compatibility)
-        if (tokenScope && tokenScope !== 'admin') {
-          console.error('❌ [Admin Panel] Invalid token scope:', tokenScope);
-          localStorage.removeItem('token');
-          throw new Error('Invalid token scope. Please contact administrator.');
-        }
-        
-        // Store token in localStorage
-        localStorage.setItem('token', data.token);
-        
-        // Map backend role to frontend format
-        const mappedRole = normalizedRole === 'superadmin' ? 'super-admin' : normalizedRole;
-        
-        // Call onLogin with role and token
-        onLogin(mappedRole, data.token);
-        
-        // Redirect based on role
-        if (normalizedRole === 'superadmin') {
-          window.location.hash = 'dashboard';
-        } else if (normalizedRole === 'moderator') {
-          window.location.hash = 'moderator-dashboard';
-        } else if (normalizedRole === 'employee') {
-          window.location.hash = 'dashboard'; // Employee goes to dashboard (Products page)
-        } else if (normalizedRole === 'viewer') {
-          window.location.hash = 'viewer-dashboard';
-        } else {
-          window.location.hash = 'dashboard';
-        }
-      } else {
-        throw new Error(data.message || 'Login failed');
       }
     } catch (err) {
       console.error('Login error:', err);
@@ -246,6 +306,79 @@ export function LoginPage({ onLogin }) {
       setLoading(false);
     }
   };
+
+  // Helper function to process login response
+  async function processLoginResponse(response) {
+    // Check if response is ok before parsing JSON
+    if (!response.ok) {
+      let errorMessage = 'Login failed';
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorMessage;
+      } catch (e) {
+        // If response is not JSON, use status text
+        errorMessage = response.statusText || `Server error (${response.status})`;
+      }
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+
+    if (data.success && data.token) {
+      // Extract role from response
+      const role = data.role || data.user?.role;
+      const normalizedRole = role?.toLowerCase();
+      
+      // Check if user has admin role (superadmin, admin, moderator, viewer, employee)
+      const adminRoles = ['superadmin', 'admin', 'moderator', 'viewer', 'employee'];
+      if (!normalizedRole || !adminRoles.includes(normalizedRole)) {
+        console.error('❌ [Admin Panel] Non-admin user attempted login. Role:', normalizedRole);
+        localStorage.removeItem('token');
+        throw new Error('Access denied. Admin panel is only for administrators. Your account role does not have admin access.');
+      }
+      
+      // Verify token scope is "admin" before storing
+      const tokenScope = getScopeFromToken(data.token);
+      
+      // If scope is "mobile", reject login and clear any existing token
+      if (tokenScope === 'mobile') {
+        console.error('❌ [Admin Panel] Mobile-scope token received. Admin panel requires admin-scope token.');
+        localStorage.removeItem('token');
+        throw new Error('Invalid token scope. Admin panel requires admin login. Please use admin credentials.');
+      }
+      
+      // Only allow tokens with scope="admin" or no scope (backward compatibility)
+      if (tokenScope && tokenScope !== 'admin') {
+        console.error('❌ [Admin Panel] Invalid token scope:', tokenScope);
+        localStorage.removeItem('token');
+        throw new Error('Invalid token scope. Please contact administrator.');
+      }
+      
+      // Store token in localStorage
+      localStorage.setItem('token', data.token);
+      
+      // Map backend role to frontend format
+      const mappedRole = normalizedRole === 'superadmin' ? 'super-admin' : normalizedRole;
+      
+      // Call onLogin with role and token
+      onLogin(mappedRole, data.token);
+      
+      // Redirect based on role
+      if (normalizedRole === 'superadmin') {
+        window.location.hash = 'dashboard';
+      } else if (normalizedRole === 'moderator') {
+        window.location.hash = 'moderator-dashboard';
+      } else if (normalizedRole === 'employee') {
+        window.location.hash = 'dashboard'; // Employee goes to dashboard (Products page)
+      } else if (normalizedRole === 'viewer') {
+        window.location.hash = 'viewer-dashboard';
+      } else {
+        window.location.hash = 'dashboard';
+      }
+    } else {
+      throw new Error(data.message || 'Login failed');
+    }
+  }
 
   // Get role display name
   const getRoleDisplayName = () => {

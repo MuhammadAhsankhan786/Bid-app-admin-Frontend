@@ -36,12 +36,38 @@ function getBaseUrl() {
     return storedUrl;
   }
 
-  // Priority 3: Check Vite development mode
+  // Priority 3: Check if it's a production domain (not localhost)
+  // If hostname is not localhost and not a private IP, it's production
+  const isProductionDomain = 
+    hostname !== 'localhost' &&
+    hostname !== '127.0.0.1' &&
+    !hostname.startsWith('192.168.') &&
+    !hostname.startsWith('10.') &&
+    !hostname.startsWith('172.') &&
+    hostname !== '' &&
+    !hostname.includes('.local');
+
+  // If on production domain, use production API directly
+  if (isProductionDomain) {
+    const productionUrl = 'https://api.mazaadati.com/api';
+    console.log('🌐 [Admin Panel] Production domain detected - Using PRODUCTION API:', productionUrl);
+    console.log('   Hostname:', hostname, 'Port:', port);
+    return productionUrl;
+  }
+
+  // Priority 4: Check environment variable (only for non-production)
+  const envUrl = import.meta.env.VITE_BASE_URL || import.meta.env.REACT_APP_BASE_URL;
+  if (envUrl && envUrl.trim() !== '') {
+    console.log('🌐 [Admin Panel] Using API URL from environment:', envUrl);
+    return envUrl;
+  }
+
+  // Priority 5: Check Vite development mode (only for localhost)
   const isViteDev = import.meta.env.MODE === 'development' ||
     import.meta.env.DEV ||
     import.meta.env.PROD === false;
 
-  // Use local URL if in development mode
+  // Use local URL if in development mode (only on localhost)
   if (isViteDev || port === '3000' || port === '5173') {
     const localUrl = 'http://localhost:5000/api';
     console.log('🌐 [Admin Panel] Development mode - Using LOCAL API:', localUrl);
@@ -50,16 +76,9 @@ function getBaseUrl() {
     return localUrl;
   }
 
-  // Priority 4: Check environment variable (only for production)
-  const envUrl = import.meta.env.VITE_BASE_URL || import.meta.env.REACT_APP_BASE_URL;
-  if (envUrl && envUrl.trim() !== '') {
-    console.log('🌐 [Admin Panel] Using API URL from environment:', envUrl);
-    return envUrl;
-  }
-
-  // Production mode (when deployed to production domain)
+  // Fallback: Production mode (when deployed to production domain)
   const productionUrl = 'https://api.mazaadati.com/api';
-  console.log('🌐 [Admin Panel] Production mode - Using PRODUCTION API:', productionUrl);
+  console.log('🌐 [Admin Panel] Fallback - Using PRODUCTION API:', productionUrl);
   console.log('   Hostname:', hostname, 'Port:', port);
   return productionUrl;
 }
