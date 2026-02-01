@@ -32,13 +32,21 @@ function getBaseUrl() {
   // Priority 2: Check localStorage for manual override (only for non-localhost)
   const storedUrl = localStorage.getItem('API_BASE_URL');
   if (storedUrl && storedUrl.trim() !== '') {
-    console.log('🌐 [Admin Panel] Using API URL from localStorage:', storedUrl);
-    return storedUrl;
+    // SECURITY FIX: If we are on production site, DO NOT allow localhost API from localStorage
+    // This fixes the issue where a developer's local setting breaks the live site
+    if (!isLocalhost && (storedUrl.includes('localhost') || storedUrl.includes('127.0.0.1'))) {
+      console.warn('⚠️ [Admin Panel] Ignoring/Removing localhost API URL on production site');
+      localStorage.removeItem('API_BASE_URL');
+      // Continue to next priority (Production Domain check)
+    } else {
+      console.log('🌐 [Admin Panel] Using API URL from localStorage:', storedUrl);
+      return storedUrl;
+    }
   }
 
   // Priority 3: Check if it's a production domain (not localhost)
   // If hostname is not localhost and not a private IP, it's production
-  const isProductionDomain = 
+  const isProductionDomain =
     hostname !== 'localhost' &&
     hostname !== '127.0.0.1' &&
     !hostname.startsWith('192.168.') &&
