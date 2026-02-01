@@ -91,8 +91,9 @@ function getBaseUrl(forceProduction = false) {
   }
 
   // Fallback: Production API (when deployed to production domain)
+  // Fallback: ALWAYS return Production API
   const productionUrl = 'https://api.mazaadati.com/api';
-  console.log('🌐 [LoginPage] Fallback - Using PRODUCTION API:', productionUrl);
+  console.log('🌐 [LoginPage] Using PRODUCTION API:', productionUrl);
   return productionUrl;
 }
 

@@ -17,9 +17,9 @@ export function getBaseUrl() {
   }
 
   // Check if in development mode
-  const isDevelopment = 
-    import.meta.env?.MODE === 'development' || 
-    import.meta.env?.DEV || 
+  const isDevelopment =
+    import.meta.env?.MODE === 'development' ||
+    import.meta.env?.DEV ||
     (typeof window !== 'undefined' && (
       window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1'
@@ -34,12 +34,15 @@ export function getBaseUrl() {
     return localUrl;
   }
 
-  // Production mode
-  const productionUrl = 'https://api.mazaadati.com/api';
-  if (typeof console !== 'undefined') {
-    console.log('🌐 [Admin Panel] Production mode - Using PRODUCTION API:', productionUrl);
-  }
-  return productionUrl;
+}
+
+// Use production URL for everything else
+// This ensures that even if deployed to a new domain, it connects to the LIVE backend
+const productionUrl = 'https://api.mazaadati.com/api';
+if (typeof console !== 'undefined') {
+  console.log('🌐 [Admin Panel] Using PRODUCTION API:', productionUrl);
+}
+return productionUrl;
 }
 
 /**

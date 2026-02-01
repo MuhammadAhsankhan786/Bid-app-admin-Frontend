@@ -84,11 +84,14 @@ function getBaseUrl() {
     return localUrl;
   }
 
-  // Fallback: Production mode (when deployed to production domain)
-  const productionUrl = 'https://api.mazaadati.com/api';
-  console.log('🌐 [Admin Panel] Fallback - Using PRODUCTION API:', productionUrl);
-  console.log('   Hostname:', hostname, 'Port:', port);
-  return productionUrl;
+  return localUrl;
+}
+
+// Fallback: ALWAYS return Production API
+// This is hardcoded as requested to ensure it works on any build
+const productionUrl = 'https://api.mazaadati.com/api';
+console.log('🌐 [Admin Panel] Using PRODUCTION API:', productionUrl);
+return productionUrl;
 }
 
 const BASE_URL = getBaseUrl();
