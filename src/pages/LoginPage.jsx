@@ -41,8 +41,15 @@ function getBaseUrl(forceProduction = false) {
   // Priority 2: Check localStorage for manual override (only for non-localhost)
   const storedUrl = localStorage.getItem('API_BASE_URL');
   if (storedUrl && storedUrl.trim() !== '') {
-    console.log('🌐 [LoginPage] Using API URL from localStorage:', storedUrl);
-    return storedUrl;
+    // SECURITY FIX: If we are on production site, DO NOT allow localhost API from localStorage
+    if (!isLocalhost && (storedUrl.includes('localhost') || storedUrl.includes('127.0.0.1'))) {
+      console.warn('⚠️ [LoginPage] Ignoring/Removing localhost API URL on production site');
+      localStorage.removeItem('API_BASE_URL');
+      // Fall through to next priority
+    } else {
+      console.log('🌐 [LoginPage] Using API URL from localStorage:', storedUrl);
+      return storedUrl;
+    }
   }
 
   // Priority 3: Check environment variable
@@ -54,7 +61,7 @@ function getBaseUrl(forceProduction = false) {
 
   // Priority 4: Check if it's a production domain (not localhost)
   // If hostname is not localhost and not a private IP, it's production
-  const isProductionDomain = 
+  const isProductionDomain =
     hostname !== 'localhost' &&
     hostname !== '127.0.0.1' &&
     !hostname.startsWith('192.168.') &&
@@ -98,10 +105,10 @@ let BASE_URL = getBaseUrl();
  */
 function normalizeIraqPhone(phone) {
   if (!phone) return null;
-  
+
   // Remove spaces and special characters except +
   let cleaned = phone.replace(/[\s-]/g, '');
-  
+
   // If starts with 0, replace with +964 (e.g., 07701234567 → +9647701234567)
   if (cleaned.startsWith('0')) {
     cleaned = '+964' + cleaned.substring(1);
@@ -118,7 +125,7 @@ function normalizeIraqPhone(phone) {
   else if (!cleaned.startsWith('+964')) {
     return null;
   }
-  
+
   return cleaned;
 }
 
@@ -130,7 +137,7 @@ function normalizeIraqPhone(phone) {
 function isValidIraqPhone(phone) {
   const normalized = normalizeIraqPhone(phone);
   if (!normalized) return false;
-  
+
   // Iraq phone format: +964 followed by 9-10 digits
   const phoneRegex = /^\+964[0-9]{9,10}$/;
   return phoneRegex.test(normalized);
@@ -227,12 +234,12 @@ export function LoginPage({ onLogin }) {
 
     try {
       const normalizedPhone = normalizeIraqPhone(phone);
-      
+
       // Smart fallback: Try local first, then production if local fails
       let currentBaseUrl = BASE_URL;
       let isLocalUrl = currentBaseUrl.includes('localhost') || currentBaseUrl.includes('127.0.0.1');
       let triedProduction = false;
-      
+
       // Try login with current URL (local or production)
       while (true) {
         console.log('🔐 [LoginPage] Attempting login to:', `${currentBaseUrl}/auth/admin-login`);
@@ -240,11 +247,11 @@ export function LoginPage({ onLogin }) {
         if (triedProduction) {
           console.log('   🔄 Retrying with PRODUCTION API (local backend not available)');
         }
-        
+
         // Create AbortController for timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout for faster fallback
-        
+
         try {
           const response = await fetch(`${currentBaseUrl}/auth/admin-login`, {
             method: 'POST',
@@ -258,16 +265,16 @@ export function LoginPage({ onLogin }) {
             signal: controller.signal
           });
           clearTimeout(timeoutId);
-          
+
           // Success! Process the response
           await processLoginResponse(response);
           return; // Exit successfully
-          
+
         } catch (fetchError) {
           clearTimeout(timeoutId);
-          
+
           // Check if it's a connection error
-          const isConnectionError = 
+          const isConnectionError =
             fetchError.name === 'AbortError' ||
             (fetchError.message && (
               fetchError.message.includes('Failed to fetch') ||
@@ -275,7 +282,7 @@ export function LoginPage({ onLogin }) {
               fetchError.message.includes('timeout') ||
               fetchError.message.includes('NetworkError')
             ));
-          
+
           // If local backend failed and we haven't tried production yet, fallback to production
           if (isConnectionError && isLocalUrl && !triedProduction) {
             console.warn('⚠️ [LoginPage] Local backend not accessible, trying production API...');
@@ -288,7 +295,7 @@ export function LoginPage({ onLogin }) {
             console.log('✅ [LoginPage] Switched to PRODUCTION API and saved to localStorage');
             continue; // Retry with production URL
           }
-          
+
           // If we already tried production or it's not a connection error, throw the error
           if (fetchError.name === 'AbortError') {
             throw new Error('Connection timeout. Please check your internet connection.');
@@ -328,7 +335,7 @@ export function LoginPage({ onLogin }) {
       // Extract role from response
       const role = data.role || data.user?.role;
       const normalizedRole = role?.toLowerCase();
-      
+
       // Check if user has admin role (superadmin, admin, moderator, viewer, employee)
       const adminRoles = ['superadmin', 'admin', 'moderator', 'viewer', 'employee'];
       if (!normalizedRole || !adminRoles.includes(normalizedRole)) {
@@ -336,33 +343,33 @@ export function LoginPage({ onLogin }) {
         localStorage.removeItem('token');
         throw new Error('Access denied. Admin panel is only for administrators. Your account role does not have admin access.');
       }
-      
+
       // Verify token scope is "admin" before storing
       const tokenScope = getScopeFromToken(data.token);
-      
+
       // If scope is "mobile", reject login and clear any existing token
       if (tokenScope === 'mobile') {
         console.error('❌ [Admin Panel] Mobile-scope token received. Admin panel requires admin-scope token.');
         localStorage.removeItem('token');
         throw new Error('Invalid token scope. Admin panel requires admin login. Please use admin credentials.');
       }
-      
+
       // Only allow tokens with scope="admin" or no scope (backward compatibility)
       if (tokenScope && tokenScope !== 'admin') {
         console.error('❌ [Admin Panel] Invalid token scope:', tokenScope);
         localStorage.removeItem('token');
         throw new Error('Invalid token scope. Please contact administrator.');
       }
-      
+
       // Store token in localStorage
       localStorage.setItem('token', data.token);
-      
+
       // Map backend role to frontend format
       const mappedRole = normalizedRole === 'superadmin' ? 'super-admin' : normalizedRole;
-      
+
       // Call onLogin with role and token
       onLogin(mappedRole, data.token);
-      
+
       // Redirect based on role
       if (normalizedRole === 'superadmin') {
         window.location.hash = 'dashboard';
@@ -423,17 +430,17 @@ export function LoginPage({ onLogin }) {
                 const Icon = role.icon;
                 const isSelected = selectedRole === role.id;
                 const colorClasses = {
-                  blue: isSelected 
-                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-950' 
+                  blue: isSelected
+                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-950'
                     : 'border-gray-200 dark:border-gray-800 hover:border-blue-300',
-                  purple: isSelected 
-                    ? 'border-purple-600 bg-purple-50 dark:bg-purple-950' 
+                  purple: isSelected
+                    ? 'border-purple-600 bg-purple-50 dark:bg-purple-950'
                     : 'border-gray-200 dark:border-gray-800 hover:border-purple-300',
-                  orange: isSelected 
-                    ? 'border-orange-600 bg-orange-50 dark:bg-orange-950' 
+                  orange: isSelected
+                    ? 'border-orange-600 bg-orange-50 dark:bg-orange-950'
                     : 'border-gray-200 dark:border-gray-800 hover:border-orange-300',
-                  green: isSelected 
-                    ? 'border-green-600 bg-green-50 dark:bg-green-950' 
+                  green: isSelected
+                    ? 'border-green-600 bg-green-50 dark:bg-green-950'
                     : 'border-gray-200 dark:border-gray-800 hover:border-green-300'
                 };
                 const iconColorClasses = {
@@ -480,25 +487,25 @@ export function LoginPage({ onLogin }) {
             <Label htmlFor="phone">Phone Number (Iraq)</Label>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="Enter your admin phone number"
-                    className="pl-10"
-                    value={phone}
-                    onChange={handlePhoneChange}
-                    required
-                    disabled={loading}
-                  />
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="Enter your admin phone number"
+                className="pl-10"
+                value={phone}
+                onChange={handlePhoneChange}
+                required
+                disabled={loading}
+              />
             </div>
-                {phoneError && (
-                  <p className="text-sm text-red-600 dark:text-red-400">{phoneError}</p>
-                )}
-                {selectedRole && (
-                  <p className="text-xs text-gray-500">
-                    Enter the phone number registered in the database for {roles.find(r => r.id === selectedRole)?.label}
-                  </p>
-                )}
+            {phoneError && (
+              <p className="text-sm text-red-600 dark:text-red-400">{phoneError}</p>
+            )}
+            {selectedRole && (
+              <p className="text-xs text-gray-500">
+                Enter the phone number registered in the database for {roles.find(r => r.id === selectedRole)?.label}
+              </p>
+            )}
           </div>
 
           {error && (
