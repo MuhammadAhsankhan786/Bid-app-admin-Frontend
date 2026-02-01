@@ -8,14 +8,15 @@ import { Checkbox } from '../components/ui/checkbox';
 import axios from 'axios';
 import React from 'react';
 
-const BASE_URL = import.meta.env.REACT_APP_BASE_URL || import.meta.env.VITE_BASE_URL || 'http://localhost:5000';
+// Hardcoded for Production as requested to prevent connection errors
+const BASE_URL = 'https://api.mazaadati.com/api';
 
 // Normalize Iraq phone number
 function normalizeIraqPhone(phone) {
   if (!phone) return null;
-  
+
   let cleaned = phone.replace(/[\s-]/g, '');
-  
+
   if (cleaned.startsWith('0')) {
     cleaned = '+964' + cleaned.substring(1);
   } else if (cleaned.startsWith('00964')) {
@@ -25,7 +26,7 @@ function normalizeIraqPhone(phone) {
   } else if (!cleaned.startsWith('+964')) {
     return null;
   }
-  
+
   return cleaned;
 }
 
@@ -194,9 +195,9 @@ export function LoginPage({ onLogin }) {
   }, React.createElement("div", {
     className: "flex items-center gap-3"
   }, React.createElement("div", {
-    className: `w-8 h-8 rounded-lg flex items-center justify-center ${selectedRole === 'super-admin' ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'}`
+    className: `w- 8 h - 8 rounded - lg flex items - center justify - center ${ selectedRole === 'super-admin' ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'} `
   }, React.createElement(Shield, {
-    className: `h-4 w-4 ${selectedRole === 'super-admin' ? 'text-white' : 'text-gray-600'}`
+    className: `h - 4 w - 4 ${ selectedRole === 'super-admin' ? 'text-white' : 'text-gray-600' } `
   })), React.createElement("div", {
     className: "flex-1"
   }, React.createElement("p", {
@@ -210,13 +211,13 @@ export function LoginPage({ onLogin }) {
   })))), React.createElement("button", {
     type: "button",
     onClick: () => setSelectedRole('moderator'),
-    className: `p-3 rounded-lg border-2 transition-all text-left ${selectedRole === 'moderator' ? 'border-purple-600 bg-purple-50 dark:bg-purple-950' : 'border-gray-200 dark:border-gray-800 hover:border-purple-300'}`
+    className: `p - 3 rounded - lg border - 2 transition - all text - left ${ selectedRole === 'moderator' ? 'border-purple-600 bg-purple-50 dark:bg-purple-950' : 'border-gray-200 dark:border-gray-800 hover:border-purple-300' } `
   }, React.createElement("div", {
     className: "flex items-center gap-3"
   }, React.createElement("div", {
-    className: `w-8 h-8 rounded-lg flex items-center justify-center ${selectedRole === 'moderator' ? 'bg-purple-600' : 'bg-gray-200 dark:bg-gray-700'}`
+    className: `w - 8 h - 8 rounded - lg flex items - center justify - center ${ selectedRole === 'moderator' ? 'bg-purple-600' : 'bg-gray-200 dark:bg-gray-700' } `
   }, React.createElement(Users, {
-    className: `h-4 w-4 ${selectedRole === 'moderator' ? 'text-white' : 'text-gray-600'}`
+    className: `h - 4 w - 4 ${ selectedRole === 'moderator' ? 'text-white' : 'text-gray-600' } `
   })), React.createElement("div", {
     className: "flex-1"
   }, React.createElement("p", {
@@ -230,13 +231,13 @@ export function LoginPage({ onLogin }) {
   })))), React.createElement("button", {
     type: "button",
     onClick: () => setSelectedRole('viewer'),
-    className: `p-3 rounded-lg border-2 transition-all text-left ${selectedRole === 'viewer' ? 'border-green-600 bg-green-50 dark:bg-green-950' : 'border-gray-200 dark:border-gray-800 hover:border-green-300'}`
+    className: `p - 3 rounded - lg border - 2 transition - all text - left ${ selectedRole === 'viewer' ? 'border-green-600 bg-green-50 dark:bg-green-950' : 'border-gray-200 dark:border-gray-800 hover:border-green-300' } `
   }, React.createElement("div", {
     className: "flex items-center gap-3"
   }, React.createElement("div", {
-    className: `w-8 h-8 rounded-lg flex items-center justify-center ${selectedRole === 'viewer' ? 'bg-green-600' : 'bg-gray-200 dark:bg-gray-700'}`
+    className: `w - 8 h - 8 rounded - lg flex items - center justify - center ${ selectedRole === 'viewer' ? 'bg-green-600' : 'bg-gray-200 dark:bg-gray-700' } `
   }, React.createElement(EyeIcon, {
-    className: `h-4 w-4 ${selectedRole === 'viewer' ? 'text-white' : 'text-gray-600'}`
+    className: `h - 4 w - 4 ${ selectedRole === 'viewer' ? 'text-white' : 'text-gray-600' } `
   })), React.createElement("div", {
     className: "flex-1"
   }, React.createElement("p", {
@@ -295,8 +296,8 @@ export function LoginPage({ onLogin }) {
     type: "button",
     onClick: handleResendOTP,
     disabled: resendCooldown > 0 || loading,
-    className: `text-sm ${resendCooldown > 0 ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600 hover:underline'}`
-  }, resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : "Resend OTP"), React.createElement("button", {
+    className: `text - sm ${ resendCooldown > 0 ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600 hover:underline' } `
+  }, resendCooldown > 0 ? `Resend OTP in ${ resendCooldown } s` : "Resend OTP"), React.createElement("button", {
     type: "button",
     onClick: () => {
       setOtpSent(false);

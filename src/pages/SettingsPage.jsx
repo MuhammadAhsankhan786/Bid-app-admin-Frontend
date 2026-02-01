@@ -306,20 +306,7 @@ export function SettingsPage({ userRole }) {
 
       // Get base URL based on environment
       function getBaseUrl() {
-        const envUrl = import.meta.env?.VITE_BASE_URL || import.meta.env?.REACT_APP_BASE_URL;
-        if (envUrl) {
-          return envUrl;
-        }
-
-        const isDevelopment = import.meta.env?.MODE === 'development' ||
-          import.meta.env?.DEV ||
-          window.location.hostname === 'localhost' ||
-          window.location.hostname === '127.0.0.1';
-
-        if (isDevelopment) {
-          return 'http://localhost:5000/api';
-        }
-
+        // Hardcoded for Production as requested
         return 'https://api.mazaadati.com/api';
       }
 
@@ -385,20 +372,7 @@ export function SettingsPage({ userRole }) {
 
           // Get base URL based on environment
           function getBaseUrl() {
-            const envUrl = import.meta.env?.VITE_BASE_URL || import.meta.env?.REACT_APP_BASE_URL;
-            if (envUrl) {
-              return envUrl;
-            }
-
-            const isDevelopment = import.meta.env?.MODE === 'development' ||
-              import.meta.env?.DEV ||
-              window.location.hostname === 'localhost' ||
-              window.location.hostname === '127.0.0.1';
-
-            if (isDevelopment) {
-              return 'http://localhost:5000/api';
-            }
-
+            // Hardcoded for Production as requested
             return 'https://api.mazaadati.com/api';
           }
 
