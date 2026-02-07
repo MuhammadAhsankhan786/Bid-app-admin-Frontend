@@ -8,8 +8,13 @@ import { getScopeFromToken } from '../utils/roleUtils';
  * - Can be overridden with VITE_BASE_URL environment variable or localStorage
  */
 function getBaseUrl() {
-  // Priority 1: Check if running on localhost (ALWAYS use local URL on localhost)
-  // This takes priority over localStorage to ensure local testing works
+  // Priority 0: Check environment variable FIRST (This allows override on localhost)
+  const envUrl = import.meta.env.VITE_BASE_URL || import.meta.env.REACT_APP_BASE_URL;
+  if (envUrl && envUrl.trim() !== '') {
+    console.log('🌐 [Admin Panel] Using API URL from environment:', envUrl);
+    return envUrl;
+  }
+
   const hostname = window.location.hostname;
   const port = window.location.port;
   const isLocalhost = hostname === 'localhost' ||
@@ -18,6 +23,8 @@ function getBaseUrl() {
     hostname.startsWith('192.168.') ||
     hostname.startsWith('10.') ||
     hostname.startsWith('172.');
+
+  // Priority 1: Check if running on localhost (ALWAYS use local URL on localhost unless env var is set)
 
   // If on localhost, ALWAYS use local URL (ignore localStorage override)
   if (isLocalhost) {
@@ -63,12 +70,6 @@ function getBaseUrl() {
     return productionUrl;
   }
 
-  // Priority 4: Check environment variable (only for non-production)
-  const envUrl = import.meta.env.VITE_BASE_URL || import.meta.env.REACT_APP_BASE_URL;
-  if (envUrl && envUrl.trim() !== '') {
-    console.log('🌐 [Admin Panel] Using API URL from environment:', envUrl);
-    return envUrl;
-  }
 
   // Priority 5: Check Vite development mode (only for localhost)
   const isViteDev = import.meta.env.MODE === 'development' ||
@@ -84,14 +85,13 @@ function getBaseUrl() {
     return localUrl;
   }
 
-  return localUrl;
-}
 
-// Fallback: ALWAYS return Production API
-// This is hardcoded as requested to ensure it works on any build
-const productionUrl = 'https://api.mazaadati.com/api';
-console.log('🌐 [Admin Panel] Using PRODUCTION API:', productionUrl);
-return productionUrl;
+
+  // Fallback: ALWAYS return Production API
+  // This is hardcoded as requested to ensure it works on any build
+  const productionUrl = 'https://api.mazaadati.com/api';
+  console.log('🌐 [Admin Panel] Using PRODUCTION API:', productionUrl);
+  return productionUrl;
 }
 
 const BASE_URL = getBaseUrl();
